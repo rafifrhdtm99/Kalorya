@@ -470,7 +470,7 @@ with tab1:
                         **Lemak:** [Angka Bulat] g
                         Berikan 1 or 2 kalimat suportif khas gen z di bagian paling bawah untuk menyemangati dia!
                         """
-                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        model = genai.GenerativeModel('gemini-flash-latest')
                         response = model.generate_content([prompt, image], generation_config={"temperature": 0.0})
                         teks_hasil = response.text
                     
