@@ -344,7 +344,11 @@ if uploaded_file is not None and api_key_configured:
                     st.rerun()
                     
                 except Exception as e:
-                    st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
+                    error_msg = str(e)
+                    if "429" in error_msg or "quota" in error_msg.lower():
+                        st.error("⏳ Oops! Terlalu banyak foto yang di-scan beruntun! (Kena batas anti-spam gratisan dari Google). Tunggu sekitar 1 menit lagi ya cantik, baru klik tombol hitung lagi! 🌸")
+                    else:
+                        st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
     else:
         if st.session_state.last_response:
             st.markdown(f"""
