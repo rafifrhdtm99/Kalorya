@@ -89,7 +89,7 @@ def save_data_to_db():
 # --- HALAMAN LOGIN ---
 if st.session_state.logged_in_user is None:
     st.markdown("<h1 style='text-align:center; color:#FFB7B2; font-family:Quicksand;'>Selamat Datang di Kalorya! 🌸</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:#8D6E63;'>Silakan masuk dengan namamu agar data jurnal dan berat badanmu tidak bercampur dengan orang lain.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#8D6E63;'>Langkah pertamamu menuju <i>body goals</i> dimulai di sini! Tulis nama panggilanmu biar Kalorya bisa menyimpan jurnal makanan dan grafik berat badanmu secara eksklusif. ✨</p>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Siapa namamu?", placeholder="Misal: Sarah")
