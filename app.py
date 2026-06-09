@@ -5,7 +5,13 @@ from PIL import Image
 import re
 import uuid
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Zona waktu WIB (GMT+7)
+WIB = timezone(timedelta(hours=7))
+
+def get_today_str():
+    return datetime.now(WIB).strftime("%Y-%m-%d")
 import pandas as pd
 import base64
 
@@ -92,24 +98,9 @@ def load_data_from_db():
         data = local_db.get(username)
 
     if data:
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        today_str = get_today_str()
         
         st.session_state.daily_records = data.get('daily_records', {})
-        
-        last_active_date = data.get('last_active_date', today_str)
-        if last_active_date != today_str:
-            st.session_state.consumed_calories = 0
-            st.session_state.consumed_carbs = 0
-            st.session_state.consumed_protein = 0
-            st.session_state.consumed_fat = 0
-            st.session_state.meal_history = []
-        else:
-            st.session_state.consumed_calories = data.get('consumed_calories', 0)
-            st.session_state.consumed_carbs = data.get('consumed_carbs', 0)
-            st.session_state.consumed_protein = data.get('consumed_protein', 0)
-            st.session_state.consumed_fat = data.get('consumed_fat', 0)
-            st.session_state.meal_history = data.get('meal_history', [])
-            
         st.session_state.target_calories = data.get('target_calories', 1800)
         
         # Profil Tubuh & Tracker
@@ -120,13 +111,32 @@ def load_data_from_db():
         st.session_state.umur = data.get('umur', 20)
         st.session_state.gender = data.get('gender', 'Perempuan')
         st.session_state.weight_history = data.get('weight_history', {})
+        
+        last_active_date = data.get('last_active_date', today_str)
+        st.session_state.last_active_date = last_active_date
+        
+        if last_active_date != today_str:
+            st.session_state.consumed_calories = 0
+            st.session_state.consumed_carbs = 0
+            st.session_state.consumed_protein = 0
+            st.session_state.consumed_fat = 0
+            st.session_state.meal_history = []
+            st.session_state.last_active_date = today_str
+            # Simpan data reset ke DB setelah variabel lain terisi
+            save_data_to_db()
+        else:
+            st.session_state.consumed_calories = data.get('consumed_calories', 0)
+            st.session_state.consumed_carbs = data.get('consumed_carbs', 0)
+            st.session_state.consumed_protein = data.get('consumed_protein', 0)
+            st.session_state.consumed_fat = data.get('consumed_fat', 0)
+            st.session_state.meal_history = data.get('meal_history', [])
 
 def save_data_to_db():
     if not st.session_state.logged_in_user:
         return
     
     username = st.session_state.logged_in_user.lower().strip()
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = get_today_str()
     
     daily_records = st.session_state.get('daily_records', {})
     daily_records[today_str] = {
@@ -251,6 +261,41 @@ if 'tb' not in st.session_state: st.session_state.tb = 160
 if 'umur' not in st.session_state: st.session_state.umur = 20
 if 'gender' not in st.session_state: st.session_state.gender = 'Perempuan'
 if 'weight_history' not in st.session_state: st.session_state.weight_history = {}
+
+# --- CEK PERGANTIAN HARI (MIDNIGHT RESET) ---
+today_str = get_today_str()
+if 'last_active_date' not in st.session_state:
+    st.session_state.last_active_date = today_str
+
+if st.session_state.last_active_date != today_str:
+    # 1. Simpan data hari kemarin ke daily_records
+    prev_date = st.session_state.last_active_date
+    if 'daily_records' not in st.session_state:
+        st.session_state.daily_records = {}
+        
+    st.session_state.daily_records[prev_date] = {
+        'calories': st.session_state.consumed_calories,
+        'carbs': st.session_state.consumed_carbs,
+        'protein': st.session_state.consumed_protein,
+        'fat': st.session_state.consumed_fat,
+        'meals': st.session_state.meal_history
+    }
+    
+    # 2. Reset tracker harian ke 0 untuk hari baru
+    st.session_state.consumed_calories = 0
+    st.session_state.consumed_carbs = 0
+    st.session_state.consumed_protein = 0
+    st.session_state.consumed_fat = 0
+    st.session_state.meal_history = []
+    st.session_state.processed_files = set()
+    st.session_state.last_response = ""
+    st.session_state.uploader_key = str(uuid.uuid4())
+    
+    st.session_state.last_active_date = today_str
+    
+    # 3. Simpan ke database
+    save_data_to_db()
+    st.rerun()
 
 # --- KONFIGURASI GEMINI AI ---
 api_key_configured = False
@@ -424,17 +469,36 @@ with tab1:
     if len(st.session_state.meal_history) == 0:
         st.markdown("<p style='color:#8D6E63; font-style:italic;'>Belum ada makanan yang dicatat hari ini. Yuk scan makan siangmu!</p>", unsafe_allow_html=True)
     else:
-        for meal in st.session_state.meal_history:
+        for idx, meal in enumerate(st.session_state.meal_history):
             jam_teks = meal.get('time', 'Waktu tak dicatat')
-            st.markdown(f"""
-            <div class="meal-item">
-                <div>
-                    <div style="font-size: 0.8rem; color: #8D6E63; margin-bottom: 4px;">🕰️ {jam_teks}</div>
-                    <div class="meal-name">🍽️ {meal['name']}</div>
+            
+            # Kolom info dan kolom hapus
+            col_info, col_del = st.columns([7, 1])
+            with col_info:
+                st.markdown(f"""
+                <div class="meal-item" style="margin-bottom: 0;">
+                    <div>
+                        <div style="font-size: 0.8rem; color: #8D6E63; margin-bottom: 4px;">🕰️ {jam_teks}</div>
+                        <div class="meal-name">🍽️ {meal['name']}</div>
+                    </div>
+                    <div class="meal-cal">+{meal['calories']} kcal</div>
                 </div>
-                <div class="meal-cal">+{meal['calories']} kcal</div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+            with col_del:
+                st.write("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                if st.button("❌", key=f"del_meal_{idx}", help=f"Hapus {meal['name']}", use_container_width=True):
+                    meal_to_delete = st.session_state.meal_history[idx]
+                    
+                    st.session_state.consumed_calories = max(0, st.session_state.consumed_calories - meal_to_delete.get("calories", 0))
+                    st.session_state.consumed_carbs = max(0, st.session_state.consumed_carbs - meal_to_delete.get("carbs", 0))
+                    st.session_state.consumed_protein = max(0, st.session_state.consumed_protein - meal_to_delete.get("protein", 0))
+                    st.session_state.consumed_fat = max(0, st.session_state.consumed_fat - meal_to_delete.get("fat", 0))
+                    
+                    st.session_state.meal_history.pop(idx)
+                    save_data_to_db()
+                    st.success(f"Berhasil menghapus {meal_to_delete['name']}! 🗑️")
+                    st.rerun()
+            st.write("")
 
     # --- FITUR UTAMA: SCAN KAMERA & AI ---
     st.markdown("<hr style='border-top: 2px dashed #FFE2E2; margin: 30px 0;'>", unsafe_allow_html=True)
@@ -499,17 +563,34 @@ with tab1:
                         lemak_match = re.search(r'\*\*Lemak:\*\*\s*(\d+)', teks_hasil)
                     
                         kalori_baru = 0
+                        karbo_baru = 0
+                        protein_baru = 0
+                        lemak_baru = 0
+                        
                         if kalori_match: 
                             kalori_baru = int(kalori_match.group(1))
                             st.session_state.consumed_calories += kalori_baru
-                        if karbo_match: st.session_state.consumed_carbs += int(karbo_match.group(1))
-                        if protein_match: st.session_state.consumed_protein += int(protein_match.group(1))
-                        if lemak_match: st.session_state.consumed_fat += int(lemak_match.group(1))
+                        if karbo_match: 
+                            karbo_baru = int(karbo_match.group(1))
+                            st.session_state.consumed_carbs += karbo_baru
+                        if protein_match: 
+                            protein_baru = int(protein_match.group(1))
+                            st.session_state.consumed_protein += protein_baru
+                        if lemak_match: 
+                            lemak_baru = int(lemak_match.group(1))
+                            st.session_state.consumed_fat += lemak_baru
                     
                         jam_str = waktu_makan.strftime('%H:%M') if waktu_makan else "Waktu tak dicatat"
                         nama_makanan_baru = nama_match.group(1).strip() if nama_match else "Makanan Lezat"
                     
-                        st.session_state.meal_history.append({"name": nama_makanan_baru, "calories": kalori_baru, "time": jam_str})
+                        st.session_state.meal_history.append({
+                            "name": nama_makanan_baru, 
+                            "calories": kalori_baru, 
+                            "carbs": karbo_baru,
+                            "protein": protein_baru,
+                            "fat": lemak_baru,
+                            "time": jam_str
+                        })
                         st.session_state.processed_files.add(file_id)
                         st.session_state.last_response = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
                     
@@ -648,7 +729,7 @@ with tab3:
             st.session_state.bb_target = input_bb_target
             
             # Simpan ke Weight Tracker
-            today_str = datetime.now().strftime("%Y-%m-%d")
+            today_str = get_today_str()
             st.session_state.weight_history[today_str] = input_bb_sekarang
             
             # Hitung TDEE target calories ulang dengan BB Sekarang
