@@ -498,11 +498,7 @@ with tab1:
                         save_data_to_db()
                         st.rerun()
                     except Exception as e:
-                        error_msg = str(e)
-                        if "429" in error_msg or "quota" in error_msg.lower():
-                            st.error("⏳ Oops! Terlalu banyak foto yang di-scan beruntun! Tunggu sekitar 1 menit lagi ya cantik, baru klik tombol hitung lagi! 🌸")
-                        else:
-                            st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
+                        st.error(f"Duh, mataku (AI) agak blur. Detail error: {e}")
         else:
             if st.session_state.last_response:
                 st.markdown(f"""
