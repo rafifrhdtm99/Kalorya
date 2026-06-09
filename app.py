@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
@@ -17,22 +18,50 @@ st.set_page_config(page_title="Kalorya", page_icon="🌸", layout="centered")
 # --- KONFIGURASI FIREBASE ---
 db = None
 firebase_configured = False
-if not firebase_admin._apps:
-    try:
-        if "FIREBASE_KEY" in st.secrets:
+
+has_firebase_key = False
+try:
+    if "FIREBASE_KEY" in st.secrets:
+        has_firebase_key = True
+except Exception:
+    pass
+
+if has_firebase_key:
+    if not firebase_admin._apps:
+        try:
             key_dict = json.loads(st.secrets["FIREBASE_KEY"])
             cred = credentials.Certificate(key_dict)
             firebase_admin.initialize_app(cred)
             db = firestore.client()
             firebase_configured = True
-    except Exception as e:
-        st.error("⚠️ Menunggu Perbaikan Kunci Firebase Anda...")
-else:
+        except Exception as e:
+            print(f"Gagal memuat kunci Firebase: {e}")
+    else:
+        try:
+            db = firestore.client()
+            firebase_configured = True
+        except Exception:
+            pass
+
+# --- DATABASE LOKAL (PERSISTENCE FALLBACK) ---
+LOCAL_DB_FILE = "kalorya_local_db.json"
+
+def load_local_db():
+    import os
+    if not os.path.exists(LOCAL_DB_FILE):
+        return {}
     try:
-        db = firestore.client()
-        firebase_configured = True
+        with open(LOCAL_DB_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
     except Exception:
-        pass
+        return {}
+
+def save_local_db(data):
+    try:
+        with open(LOCAL_DB_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        print(f"Gagal menyimpan database lokal: {e}")
 
 # --- STATE LOGIN (MULTI-USER) ---
 if 'logged_in_user' not in st.session_state:
@@ -42,79 +71,105 @@ if 'user_pin' not in st.session_state:
 
 # --- FUNGSI DATABASE ---
 def load_data_from_db():
-    if not firebase_configured or db is None or not st.session_state.logged_in_user:
+    if not st.session_state.logged_in_user:
         return
-    try:
-        username = st.session_state.logged_in_user.lower().strip()
-        doc_ref = db.collection('kalorya_users').document(username)
-        doc = doc_ref.get()
-        if doc.exists:
-            data = doc.to_dict()
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            
-            st.session_state.daily_records = data.get('daily_records', {})
-            
-            last_active_date = data.get('last_active_date', today_str)
-            if last_active_date != today_str:
-                st.session_state.consumed_calories = 0
-                st.session_state.consumed_carbs = 0
-                st.session_state.consumed_protein = 0
-                st.session_state.consumed_fat = 0
-                st.session_state.meal_history = []
-            else:
-                st.session_state.consumed_calories = data.get('consumed_calories', 0)
-                st.session_state.consumed_carbs = data.get('consumed_carbs', 0)
-                st.session_state.consumed_protein = data.get('consumed_protein', 0)
-                st.session_state.consumed_fat = data.get('consumed_fat', 0)
-                st.session_state.meal_history = data.get('meal_history', [])
-                
-            st.session_state.target_calories = data.get('target_calories', 1800)
-            
-            # Profil Tubuh & Tracker
-            st.session_state.bb = data.get('bb', 50)
-            st.session_state.tb = data.get('tb', 160)
-            st.session_state.umur = data.get('umur', 20)
-            st.session_state.gender = data.get('gender', 'Perempuan')
-            st.session_state.weight_history = data.get('weight_history', {})
-    except Exception as e:
-        print(f"Error loading from db: {e}")
+    
+    username = st.session_state.logged_in_user.lower().strip()
+    data = None
 
-def save_data_to_db():
-    if not firebase_configured or db is None or not st.session_state.logged_in_user:
-        return
-    try:
-        username = st.session_state.logged_in_user.lower().strip()
-        doc_ref = db.collection('kalorya_users').document(username)
+    if firebase_configured and db is not None:
+        try:
+            doc_ref = db.collection('kalorya_users').document(username)
+            doc = doc_ref.get()
+            if doc.exists:
+                data = doc.to_dict()
+        except Exception as e:
+            print(f"Error loading from Firestore: {e}")
+            
+    if data is None:
+        # Fallback ke database lokal
+        local_db = load_local_db()
+        data = local_db.get(username)
+
+    if data:
         today_str = datetime.now().strftime("%Y-%m-%d")
         
-        daily_records = st.session_state.get('daily_records', {})
-        daily_records[today_str] = {
-            'calories': st.session_state.consumed_calories,
-            'carbs': st.session_state.consumed_carbs,
-            'protein': st.session_state.consumed_protein,
-            'fat': st.session_state.consumed_fat,
-            'meals': st.session_state.meal_history
-        }
+        st.session_state.daily_records = data.get('daily_records', {})
         
-        doc_ref.set({
-            'last_active_date': today_str,
-            'daily_records': daily_records,
-            'consumed_calories': st.session_state.consumed_calories,
-            'consumed_carbs': st.session_state.consumed_carbs,
-            'consumed_protein': st.session_state.consumed_protein,
-            'consumed_fat': st.session_state.consumed_fat,
-            'meal_history': st.session_state.meal_history,
-            'target_calories': st.session_state.target_calories,
-            'bb': st.session_state.get('bb', 50),
-            'tb': st.session_state.get('tb', 160),
-            'umur': st.session_state.get('umur', 20),
-            'gender': st.session_state.get('gender', 'Perempuan'),
-            'weight_history': st.session_state.get('weight_history', {}),
-            'pin': st.session_state.get('user_pin', ''),
-            'last_updated': firestore.SERVER_TIMESTAMP
-        })
-    except Exception as e:
-        print(f"Error saving to db: {e}")
+        last_active_date = data.get('last_active_date', today_str)
+        if last_active_date != today_str:
+            st.session_state.consumed_calories = 0
+            st.session_state.consumed_carbs = 0
+            st.session_state.consumed_protein = 0
+            st.session_state.consumed_fat = 0
+            st.session_state.meal_history = []
+        else:
+            st.session_state.consumed_calories = data.get('consumed_calories', 0)
+            st.session_state.consumed_carbs = data.get('consumed_carbs', 0)
+            st.session_state.consumed_protein = data.get('consumed_protein', 0)
+            st.session_state.consumed_fat = data.get('consumed_fat', 0)
+            st.session_state.meal_history = data.get('meal_history', [])
+            
+        st.session_state.target_calories = data.get('target_calories', 1800)
+        
+        # Profil Tubuh & Tracker
+        st.session_state.bb = data.get('bb', 50)
+        st.session_state.bb_awal = data.get('bb_awal', st.session_state.bb)
+        st.session_state.bb_target = data.get('bb_target', st.session_state.bb - 5)
+        st.session_state.tb = data.get('tb', 160)
+        st.session_state.umur = data.get('umur', 20)
+        st.session_state.gender = data.get('gender', 'Perempuan')
+        st.session_state.weight_history = data.get('weight_history', {})
+
+def save_data_to_db():
+    if not st.session_state.logged_in_user:
+        return
+    
+    username = st.session_state.logged_in_user.lower().strip()
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    daily_records = st.session_state.get('daily_records', {})
+    daily_records[today_str] = {
+        'calories': st.session_state.consumed_calories,
+        'carbs': st.session_state.consumed_carbs,
+        'protein': st.session_state.consumed_protein,
+        'fat': st.session_state.consumed_fat,
+        'meals': st.session_state.meal_history
+    }
+    
+    user_data = {
+        'last_active_date': today_str,
+        'daily_records': daily_records,
+        'consumed_calories': st.session_state.consumed_calories,
+        'consumed_carbs': st.session_state.consumed_carbs,
+        'consumed_protein': st.session_state.consumed_protein,
+        'consumed_fat': st.session_state.consumed_fat,
+        'meal_history': st.session_state.meal_history,
+        'target_calories': st.session_state.target_calories,
+        'bb': st.session_state.get('bb', 50),
+        'bb_awal': st.session_state.get('bb_awal', 50),
+        'bb_target': st.session_state.get('bb_target', 50),
+        'tb': st.session_state.get('tb', 160),
+        'umur': st.session_state.get('umur', 20),
+        'gender': st.session_state.get('gender', 'Perempuan'),
+        'weight_history': st.session_state.get('weight_history', {}),
+        'pin': st.session_state.get('user_pin', '')
+    }
+
+    # Simpan secara lokal
+    local_db = load_local_db()
+    local_db[username] = user_data
+    save_local_db(local_db)
+
+    # Simpan ke Firestore jika terhubung
+    if firebase_configured and db is not None:
+        try:
+            doc_ref = db.collection('kalorya_users').document(username)
+            firestore_data = user_data.copy()
+            firestore_data['last_updated'] = firestore.SERVER_TIMESTAMP
+            doc_ref.set(firestore_data)
+        except Exception as e:
+            print(f"Error saving to Firestore: {e}")
 
 # --- HALAMAN LOGIN ---
 if st.session_state.logged_in_user is None:
@@ -127,14 +182,31 @@ if st.session_state.logged_in_user is None:
         submit = st.form_submit_button("Masuk / Buka Ruangan 🚀", use_container_width=True)
         
         if submit and username_input and pin_input:
+            username_clean = username_input.lower().strip()
+            
+            # Coba verifikasi dengan Firestore jika terhubung
+            verified = False
+            pin_checked = False
             if firebase_configured and db is not None:
-                username_clean = username_input.lower().strip()
-                doc_ref = db.collection('kalorya_users').document(username_clean)
-                doc = doc_ref.get()
-                
-                if doc.exists:
-                    data = doc.to_dict()
-                    saved_pin = data.get('pin', '')
+                try:
+                    doc_ref = db.collection('kalorya_users').document(username_clean)
+                    doc = doc_ref.get()
+                    if doc.exists:
+                        data = doc.to_dict()
+                        saved_pin = data.get('pin', '')
+                        pin_checked = True
+                        if saved_pin != "" and saved_pin != pin_input:
+                            st.error("Oops! PIN yang kamu masukkan salah. Coba lagi ya! ❌")
+                            st.stop()
+                        verified = True
+                except Exception:
+                    pass
+
+            # Jika tidak terverifikasi via Firestore, coba via database lokal
+            if not pin_checked:
+                local_db = load_local_db()
+                if username_clean in local_db:
+                    saved_pin = local_db[username_clean].get('pin', '')
                     if saved_pin != "" and saved_pin != pin_input:
                         st.error("Oops! PIN yang kamu masukkan salah. Coba lagi ya! ❌")
                         st.stop()
@@ -153,6 +225,8 @@ if st.session_state.logged_in_user is None:
             st.session_state.daily_records = {}
             st.session_state.target_calories = 1800
             st.session_state.weight_history = {}
+            st.session_state.bb_awal = 50
+            st.session_state.bb_target = 50
             # Muat data usernya
             load_data_from_db()
             st.rerun()
@@ -171,6 +245,8 @@ if 'meal_history' not in st.session_state: st.session_state.meal_history = []
 if 'daily_records' not in st.session_state: st.session_state.daily_records = {}
 if 'target_calories' not in st.session_state: st.session_state.target_calories = 1800
 if 'bb' not in st.session_state: st.session_state.bb = 50
+if 'bb_awal' not in st.session_state: st.session_state.bb_awal = 50
+if 'bb_target' not in st.session_state: st.session_state.bb_target = 50
 if 'tb' not in st.session_state: st.session_state.tb = 160
 if 'umur' not in st.session_state: st.session_state.umur = 20
 if 'gender' not in st.session_state: st.session_state.gender = 'Perempuan'
@@ -178,12 +254,19 @@ if 'weight_history' not in st.session_state: st.session_state.weight_history = {
 
 # --- KONFIGURASI GEMINI AI ---
 api_key_configured = False
+has_gemini_key = False
 try:
     if "GEMINI_API_KEY" in st.secrets:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        api_key_configured = True
+        has_gemini_key = True
 except Exception:
     pass
+
+if has_gemini_key:
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        api_key_configured = True
+    except Exception:
+        pass
 
 # --- FUNGSI BANTUAN UI ---
 def get_base64_of_bin_file(bin_file):
@@ -295,48 +378,9 @@ header_html = f"""
 </div>
 """
 st.markdown(header_html, unsafe_allow_html=True)
-
-st.write("") 
-
-tab1, tab2 = st.tabs(["🏠 Beranda Hari Ini", "📅 Rekap & Riwayat"])
+st.write("")
+tab1, tab2, tab3 = st.tabs(["🏠 Beranda Hari Ini", "📅 Rekap & Riwayat", "📈 Pantau Berat Badan"])
 with tab1:
-    # --- WIDGET PROFIL TUBUH ---
-    with st.expander("👤 Profil Tubuh & Target Cerdas"):
-        st.markdown("Isi data di bawah ini agar Kalorya bisa menghitung target kalorimu secara presisi sesuai rumus medis (Mifflin-St Jeor).")
-        colA, colB = st.columns(2)
-        with colA:
-            input_bb = st.number_input("Berat Badan (kg)", 30, 200, st.session_state.bb)
-            input_umur = st.number_input("Umur (tahun)", 10, 100, st.session_state.umur)
-        with colB:
-            input_tb = st.number_input("Tinggi Badan (cm)", 100, 250, st.session_state.tb)
-            input_gender = st.selectbox("Jenis Kelamin", ["Perempuan", "Laki-laki"], index=0 if st.session_state.gender == 'Perempuan' else 1)
-        
-        # Hitung TDEE Dasar (BMR * 1.2 untuk Sedentary)
-        if input_gender == "Laki-laki":
-            bmr = (10 * input_bb) + (6.25 * input_tb) - (5 * input_umur) + 5
-        else:
-            bmr = (10 * input_bb) + (6.25 * input_tb) - (5 * input_umur) - 161
-        rekomendasi_tdee = int(bmr * 1.2)
-    
-        st.info(f"💡 Rekomendasi Medis: Tubuhmu membakar sekitar **{rekomendasi_tdee} kcal** per hari. Kalau mau nurunin berat badan, usahakan target kalorimu di bawah angka tersebut (misal: kurangi 300-500).")
-    
-        # Input Target Kalori Tetap Bisa Diubah Manual
-        target_pilihan = st.number_input("Atur Target Kalori Harianmu:", 500, 5000, value=st.session_state.target_calories, step=50)
-    
-        if st.button("Simpan Profil & Catat BB Hari Ini"):
-            st.session_state.bb = input_bb
-            st.session_state.tb = input_tb
-            st.session_state.umur = input_umur
-            st.session_state.gender = input_gender
-            st.session_state.target_calories = target_pilihan
-        
-            # Simpan ke Weight Tracker
-            today_str = datetime.now().strftime("%Y-%m-%d")
-            st.session_state.weight_history[today_str] = input_bb
-        
-            save_data_to_db()
-            st.success("Data berhasil diamankan ke brankas! 🔒")
-
     # --- WIDGET LINGKARAN KALORI ---
     consumed = st.session_state.consumed_calories
     karbo = st.session_state.consumed_carbs
@@ -392,18 +436,6 @@ with tab1:
             </div>
             """, unsafe_allow_html=True)
 
-    # --- PELACAK BERAT BADAN (WEIGHT TRACKER) ---
-    if st.session_state.weight_history:
-        st.markdown("<h3 style='color:#5D4037; font-weight:700; margin-top:30px; margin-bottom:15px;'>📈 Perjalanan Berat Badanku</h3>", unsafe_allow_html=True)
-        # Ubah dict ke dataframe untuk chart
-        df_weight = pd.DataFrame(list(st.session_state.weight_history.items()), columns=['Tanggal', 'Berat (kg)'])
-        df_weight['Tanggal'] = pd.to_datetime(df_weight['Tanggal'])
-        df_weight = df_weight.sort_values('Tanggal')
-    
-        # Line chart Streamlit bawaan sangat bagus dan rapi
-        st.line_chart(df_weight.set_index('Tanggal'))
-
-
     # --- FITUR UTAMA: SCAN KAMERA & AI ---
     st.markdown("<hr style='border-top: 2px dashed #FFE2E2; margin: 30px 0;'>", unsafe_allow_html=True)
     st.markdown("<h3 style='color:#5D4037; text-align:center; font-weight:700;'>Scan Makananmu Di Sini! 📸</h3>", unsafe_allow_html=True)
@@ -436,7 +468,7 @@ with tab1:
                         **Karbohidrat:** [Angka Bulat] g
                         **Protein:** [Angka Bulat] g
                         **Lemak:** [Angka Bulat] g
-                        Berikan 1 atau 2 kalimat suportif khas gen z di bagian paling bawah untuk menyemangati dia!
+                        Berikan 1 or 2 kalimat suportif khas gen z di bagian paling bawah untuk menyemangati dia!
                         """
                         model = genai.GenerativeModel('gemini-2.5-flash')
                         response = model.generate_content([prompt, image], generation_config={"temperature": 0.0})
@@ -523,3 +555,242 @@ with tab2:
                 st.markdown(f"""<div class=\"meal-item\"><div style=\"font-size: 0.8rem; color: #8D6E63; margin-bottom: 4px;\">🕰️ {jam_teks}</div><div class=\"meal-name\">🍽️ {meal['name']}</div><div class=\"meal-cal\">+{meal['calories']} kcal</div></div>""", unsafe_allow_html=True)
         else:
             st.warning("Tidak ada catatan makanan pada tanggal ini.")
+
+with tab3:
+    st.markdown("<h3 style='color:#5D4037; font-weight:700;'>📈 Pantau Berat Badan</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#8D6E63;'>Pantau target berat badan Anda dan pacar Anda secara berkala di sini. ✨</p>", unsafe_allow_html=True)
+
+    # --- WIDGET MONITORING PROGRESS BERAT BADAN ---
+    bb_awal = st.session_state.bb_awal
+    bb_target = st.session_state.bb_target
+    bb_sekarang = st.session_state.bb
+    
+    total_diff = abs(bb_awal - bb_target)
+    if total_diff == 0:
+        progress_persen = 100.0
+    else:
+        if bb_target < bb_awal:  # Nurunin BB
+            progress_persen = max(0.0, min(100.0, ((bb_awal - bb_sekarang) / total_diff) * 100))
+        else:  # Naikin BB
+            progress_persen = max(0.0, min(100.0, ((bb_sekarang - bb_awal) / total_diff) * 100))
+            
+    berat_hilang = bb_awal - bb_sekarang
+    if bb_target < bb_awal:
+        label_status = f"Turun {abs(berat_hilang):.1f} kg" if berat_hilang >= 0 else f"Naik {abs(berat_hilang):.1f} kg"
+        if berat_hilang > 0:
+            motivasi = f"Hebat! Defisit kalorimu berhasil memotong <b>{abs(berat_hilang):.1f} kg</b> dari target penurunan <b>{total_diff:.1f} kg</b>! 💪✨"
+        else:
+            motivasi = f"Semangat! Konsisten defisit kalori, hasil penurunan berat badan akan segera terlihat! 🌸"
+    else:
+        label_status = f"Naik {abs(berat_hilang):.1f} kg" if berat_hilang <= 0 else f"Turun {abs(berat_hilang):.1f} kg"
+        if berat_hilang < 0:
+            motivasi = f"Keren! Berat badanmu sudah bertambah <b>{abs(berat_hilang):.1f} kg</b> dari target bulking <b>{total_diff:.1f} kg</b>! 💪🍳"
+        else:
+            motivasi = f"Ayo makan bergizi dengan kalori surplus untuk meningkatkan berat badanmu! 🍎"
+            
+    weight_bar_html = f"""<div class="cute-card">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: nowrap; gap: 8px;">
+<h3 style="margin: 0; font-size: clamp(1rem, 4.5vw, 1.25rem); color: #5D4037; font-weight: 700;">🎯 Target Berat Badan</h3>
+<span style="font-size: 0.85rem; font-weight: 700; color: #FFB7B2; background: #FFE2E2; padding: 4px 10px; border-radius: 12px; white-space: nowrap;">{label_status}</span>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 0.9rem; font-weight: 600; color: #8D6E63; margin-bottom: 8px;">
+<span>Awal: <b>{bb_awal} kg</b></span>
+<span>Target: <b>{bb_target} kg</b></span>
+</div>
+<div style="background: #FFE2E2; height: 14px; border-radius: 7px; position: relative; margin-bottom: 24px; width: 100%;">
+<div style="background: #FFB7B2; height: 100%; width: {progress_persen}%; border-radius: 7px; position: relative; transition: width 0.5s ease;">
+<div style="position: absolute; right: 0; top: -24px; background: #FF9B94; color: white; font-size: 0.75rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; transform: translateX(50%); white-space: nowrap; box-shadow: 0 2px 4px rgba(255,155,148,0.3);">
+{bb_sekarang} kg ({int(progress_persen)}%)
+</div>
+</div>
+</div>
+<div style="font-size: 0.85rem; color: #8D6E63; text-align: center; line-height: 1.4;">
+{motivasi}
+</div>
+</div>"""
+    st.markdown(weight_bar_html, unsafe_allow_html=True)
+
+    # --- FORM UPDATE BERAT BADAN LANGSUNG ---
+    st.markdown("<h4 style='color:#5D4037; font-weight:700; margin-top:20px; margin-bottom:10px;'>📝 Perbarui Berat Badan & Target Hari Ini</h4>", unsafe_allow_html=True)
+    with st.form("update_weight_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            input_bb_awal = st.number_input("Berat Badan Awal (kg)", 30, 200, int(st.session_state.bb_awal))
+        with col2:
+            input_bb_sekarang = st.number_input("Berat Badan Sekarang (kg)", 30, 200, int(st.session_state.bb))
+        with col3:
+            input_bb_target = st.number_input("Target Berat Badan (kg)", 30, 200, int(st.session_state.bb_target))
+            
+        submitted = st.form_submit_button("Simpan & Perbarui Progress 🚀", use_container_width=True)
+        if submitted:
+            st.session_state.bb_awal = input_bb_awal
+            st.session_state.bb = input_bb_sekarang
+            st.session_state.bb_target = input_bb_target
+            
+            # Simpan ke Weight Tracker
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            st.session_state.weight_history[today_str] = input_bb_sekarang
+            
+            # Hitung TDEE target calories ulang dengan BB Sekarang
+            if st.session_state.gender == "Laki-laki":
+                bmr = (10 * input_bb_sekarang) + (6.25 * st.session_state.tb) - (5 * st.session_state.umur) + 5
+            else:
+                bmr = (10 * input_bb_sekarang) + (6.25 * st.session_state.tb) - (5 * st.session_state.umur) - 161
+            rekomendasi_tdee = int(bmr * 1.2)
+            
+            diet_plan = st.session_state.get('diet_plan', "Turunkan Berat Badan (Normal: -500 kcal/hari)")
+            if "Normal: -500" in diet_plan:
+                target_rekomendasi = rekomendasi_tdee - 500
+            elif "Santai: -250" in diet_plan:
+                target_rekomendasi = rekomendasi_tdee - 250
+            elif "Agresif: -750" in diet_plan:
+                target_rekomendasi = rekomendasi_tdee - 750
+            elif "Bulking Santai: +250" in diet_plan:
+                target_rekomendasi = rekomendasi_tdee + 250
+            elif "Bulking Normal: +500" in diet_plan:
+                target_rekomendasi = rekomendasi_tdee + 500
+            else:
+                target_rekomendasi = rekomendasi_tdee
+                
+            min_safe_cal = 1200 if st.session_state.gender == "Perempuan" else 1500
+            if target_rekomendasi < min_safe_cal and "Turunkan" in diet_plan:
+                target_rekomendasi = min_safe_cal
+                
+            st.session_state.target_calories = int(target_rekomendasi)
+            
+            save_data_to_db()
+            st.success("Progress berat badan berhasil diperbarui! 🎉")
+            st.rerun()
+
+    # --- TOMBOL RESET BERAT BADAN ---
+    if st.button("Reset Data & Riwayat Berat Badan 🔄", type="secondary", use_container_width=True):
+        st.session_state.bb_awal = 50
+        st.session_state.bb = 50
+        st.session_state.bb_target = 50
+        st.session_state.weight_history = {}
+        save_data_to_db()
+        st.success("Data berat badan dan riwayat berhasil di-reset! Silakan masukkan data baru Anda. 🔄")
+        st.rerun()
+
+    # --- WIDGET PROFIL TUBUH & TARGET CERDAS ---
+    with st.expander("⚙️ Pengaturan Profil & Rencana Kalori"):
+        st.markdown("Isi data profil tubuh di bawah ini untuk menghitung rekomendasi TDEE secara otomatis.")
+        colA, colB = st.columns(2)
+        with colA:
+            input_tb = st.number_input("Tinggi Badan (cm)", 100, 250, st.session_state.tb)
+            input_umur = st.number_input("Umur (tahun)", 10, 100, st.session_state.umur)
+        with colB:
+            input_gender = st.selectbox("Jenis Kelamin", ["Perempuan", "Laki-laki"], index=0 if st.session_state.gender == 'Perempuan' else 1)
+        
+        # Hitung TDEE Dasar (BMR * 1.2 untuk Sedentary)
+        if input_gender == "Laki-laki":
+            bmr = (10 * st.session_state.bb) + (6.25 * input_tb) - (5 * input_umur) + 5
+        else:
+            bmr = (10 * st.session_state.bb) + (6.25 * input_tb) - (5 * input_umur) - 161
+        rekomendasi_tdee = int(bmr * 1.2)
+    
+        st.info(f"💡 Rekomendasi Medis (TDEE): Tubuhmu membakar sekitar **{rekomendasi_tdee} kcal** per hari (berdasarkan BB sekarang: **{st.session_state.bb} kg**).")
+        
+        # Pilihan Rencana Diet
+        tujuan_opsi = [
+            "Turunkan Berat Badan (Santai: -250 kcal/hari)",
+            "Turunkan Berat Badan (Normal: -500 kcal/hari)",
+            "Turunkan Berat Badan (Agresif: -750 kcal/hari)",
+            "Pertahankan Berat Badan (TDEE)",
+            "Naikkan Berat Badan (Bulking Santai: +250 kcal/hari)",
+            "Naikkan Berat Badan (Bulking Normal: +500 kcal/hari)"
+        ]
+        
+        if 'diet_plan' not in st.session_state:
+            st.session_state.diet_plan = "Turunkan Berat Badan (Normal: -500 kcal/hari)"
+            
+        try:
+            default_plan_idx = tujuan_opsi.index(st.session_state.diet_plan)
+        except ValueError:
+            default_plan_idx = 1
+            
+        diet_plan_pilihan = st.selectbox("Rencana Target Kalori:", tujuan_opsi, index=default_plan_idx)
+        
+        # Hitung penyesuaian kalori
+        if "Normal: -500" in diet_plan_pilihan:
+            target_rekomendasi = rekomendasi_tdee - 500
+        elif "Santai: -250" in diet_plan_pilihan:
+            target_rekomendasi = rekomendasi_tdee - 250
+        elif "Agresif: -750" in diet_plan_pilihan:
+            target_rekomendasi = rekomendasi_tdee - 750
+        elif "Bulking Santai: +250" in diet_plan_pilihan:
+            target_rekomendasi = rekomendasi_tdee + 250
+        elif "Bulking Normal: +500" in diet_plan_pilihan:
+            target_rekomendasi = rekomendasi_tdee + 500
+        else:
+            target_rekomendasi = rekomendasi_tdee
+            
+        # Batasi batas kalori aman (wanita min 1200 kcal, pria min 1500 kcal)
+        min_safe_cal = 1200 if input_gender == "Perempuan" else 1500
+        if target_rekomendasi < min_safe_cal and "Turunkan" in diet_plan_pilihan:
+            st.warning(f"⚠️ Target kalori ({target_rekomendasi} kcal) berada di bawah batas kalori aman harian ({min_safe_cal} kcal). Target kalori secara otomatis disesuaikan agar tetap aman bagi kesehatan.")
+            target_rekomendasi = min_safe_cal
+
+        target_pilihan = st.number_input("Target Kalori Harianmu (Bisa diedit manual):", 500, 5000, value=int(target_rekomendasi), step=50)
+    
+        if st.button("Simpan Profil & Rencana Kalori"):
+            st.session_state.tb = input_tb
+            st.session_state.umur = input_umur
+            st.session_state.gender = input_gender
+            st.session_state.diet_plan = diet_plan_pilihan
+            st.session_state.target_calories = target_pilihan
+        
+            save_data_to_db()
+            st.success("Profil & Rencana Kalori berhasil diperbarui! 🔒")
+            st.rerun()
+
+    # --- RIWAYAT BERAT BADAN (WEIGHT HISTORY LIST) ---
+    if st.session_state.weight_history:
+        st.markdown("<h3 style='color:#5D4037; font-weight:700; margin-top:30px; margin-bottom:15px;'>📅 Catatan Berat Badan</h3>", unsafe_allow_html=True)
+        
+        # Urutkan riwayat berdasarkan tanggal (ascending) untuk menghitung selisihnya
+        sorted_history = sorted(st.session_state.weight_history.items(), key=lambda x: x[0])
+        
+        history_items = []
+        for idx, (tgl, berat) in enumerate(sorted_history):
+            if idx == 0:
+                perubahan = "Awal"
+                color = "#8D6E63"  # Cokelat default
+            else:
+                diff = berat - sorted_history[idx-1][1]
+                if diff < 0:
+                    perubahan = f"⬇️ -{abs(diff):.1f} kg"
+                    color = "#81C784"  # Hijau (penurunan berat)
+                elif diff > 0:
+                    perubahan = f"⬆️ +{abs(diff):.1f} kg"
+                    color = "#E57373"  # Merah (kenaikan berat)
+                else:
+                    perubahan = "Tetap"
+                    color = "#8D6E63"
+            
+            try:
+                tgl_dt = datetime.strptime(tgl, "%Y-%m-%d")
+                tgl_cantik = tgl_dt.strftime("%d %b %Y")
+            except Exception:
+                tgl_cantik = tgl
+                
+            history_items.append({
+                "tanggal": tgl_cantik,
+                "berat": f"{berat} kg",
+                "perubahan": perubahan,
+                "color": color
+            })
+            
+        # Balik urutan agar data terbaru berada paling atas
+        history_items.reverse()
+        
+        for item in history_items:
+            st.markdown(f"""
+            <div class="meal-item" style="border-left: 4px solid {item['color']}; padding: 12px 16px; margin-bottom: 8px;">
+                <div style="font-weight: 700; color: #5D4037;">🗓️ {item['tanggal']}</div>
+                <div style="font-weight: 700; color: #5D4037; display: flex; gap: 12px; align-items: center;">
+                    <span>⚖️ {item['berat']}</span>
+                    <span style="color: {item['color']}; font-size: 0.95rem; font-weight: 700;">({item['perubahan']})</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
