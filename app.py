@@ -1,8 +1,26 @@
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
+import re
+import uuid
 
 st.set_page_config(page_title="Kalorya", page_icon="🌸", layout="centered")
+
+# --- INISIALISASI STATE (MEMORI APLIKASI) ---
+if 'consumed_calories' not in st.session_state:
+    st.session_state.consumed_calories = 0
+if 'consumed_carbs' not in st.session_state:
+    st.session_state.consumed_carbs = 0
+if 'consumed_protein' not in st.session_state:
+    st.session_state.consumed_protein = 0
+if 'consumed_fat' not in st.session_state:
+    st.session_state.consumed_fat = 0
+if 'processed_files' not in st.session_state:
+    st.session_state.processed_files = set()
+if 'last_response' not in st.session_state:
+    st.session_state.last_response = ""
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = str(uuid.uuid4())
 
 # --- KONFIGURASI GEMINI AI ---
 api_key_configured = False
@@ -56,6 +74,21 @@ st.markdown("""
         width: 40px;
         height: 40px;
     }
+    
+    /* Tombol Restart */
+    .stButton>button {
+        background-color: #FFF0F5 !important;
+        color: #FFB7B2 !important;
+        border: 2px solid #FFB7B2 !important;
+        border-radius: 20px !important;
+        font-weight: 700 !important;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #FFB7B2 !important;
+        color: white !important;
+        transform: scale(1.02);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -70,12 +103,17 @@ with col2:
 st.write("") # Spasi
 
 # --- WIDGET LINGKARAN KALORI (HTML CUSTOM) ---
-consumed = 1250
+consumed = st.session_state.consumed_calories
+karbo = st.session_state.consumed_carbs
+protein = st.session_state.consumed_protein
+lemak = st.session_state.consumed_fat
+
 target = 1800
 progress = min((consumed / target) * 100, 100)
 dash_offset = 439.8 - (439.8 * progress / 100)
 
 ring_html = f"""<div class="cute-card">
+<h3 style="text-align: center; color: #FFB7B2; margin-top: 0; margin-bottom: 20px; font-weight: 700;">Kalori kamu hari ini</h3>
 <div style="position: relative; width: 180px; height: 180px; margin: 0 auto 20px;">
 <svg width="180" height="180" viewBox="0 0 160 160" style="transform: rotate(-90deg);">
 <circle cx="80" cy="80" r="70" fill="none" stroke="#FFE2E2" stroke-width="14" />
@@ -89,24 +127,15 @@ ring_html = f"""<div class="cute-card">
 <div style="display: flex; justify-content: space-around; margin-top: 10px;">
 <div style="text-align: center;">
 <div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Karbo</div>
-<div style="width: 55px; height: 6px; background: #E0F2F1; border-radius: 3px; margin: 0 auto 8px;">
-<div style="width: 80%; height: 100%; background: #4DD0E1; border-radius: 3px;"></div>
-</div>
-<div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">120g</div>
+<div style="font-weight: 700; color: #4DD0E1; font-size: 1.1rem;">{karbo}g</div>
 </div>
 <div style="text-align: center;">
 <div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Protein</div>
-<div style="width: 55px; height: 6px; background: #FFE2E2; border-radius: 3px; margin: 0 auto 8px;">
-<div style="width: 75%; height: 100%; background: #FFB7B2; border-radius: 3px;"></div>
-</div>
-<div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">45g</div>
+<div style="font-weight: 700; color: #FFB7B2; font-size: 1.1rem;">{protein}g</div>
 </div>
 <div style="text-align: center;">
 <div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Lemak</div>
-<div style="width: 55px; height: 6px; background: #E8F5E9; border-radius: 3px; margin: 0 auto 8px;">
-<div style="width: 80%; height: 100%; background: #81C784; border-radius: 3px;"></div>
-</div>
-<div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">40g</div>
+<div style="font-weight: 700; color: #81C784; font-size: 1.1rem;">{lemak}g</div>
 </div>
 </div>
 </div>"""
@@ -121,48 +150,87 @@ st.markdown("<p style='text-align:center; color:#8D6E63; margin-top:-10px; margi
 if not api_key_configured:
     st.error("⚠️ Menunggu Kunci Rahasia... Minta panduan dari developer untuk memasukkan API Key di Streamlit Secrets.")
 
-# Tombol Upload yang sudah dipercantik CSS menjadi tombol kamera
-uploaded_file = st.file_uploader("Scan Kalori!", type=["jpg", "png", "jpeg", "webp"], label_visibility="collapsed")
+# Tombol Upload menggunakan key dinamis agar bisa di-reset
+uploaded_file = st.file_uploader("Scan Kalori!", type=["jpg", "png", "jpeg", "webp"], label_visibility="collapsed", key=st.session_state.uploader_key)
 
 if uploaded_file is not None and api_key_configured:
     st.image(uploaded_file, caption="Makanan yang sedang diproses...", use_container_width=True)
     
-    with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
-        try:
-            image = Image.open(uploaded_file)
-            prompt = """
-            Kamu adalah asisten diet wanita gen z yang ramah, manis, dan suportif bernama Kalorya.
-            Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi kasar nutrisinya.
-            
-            Format balasan harus persis seperti ini:
-            **Nama Makanan:** [Tebakanmu]
-            **Estimasi Kalori:** [Angka] kcal
-            **Karbohidrat:** [Angka] g
-            **Protein:** [Angka] g
-            **Lemak:** [Angka] g
-            
-            Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
-            """
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content([prompt, image])
-            import re
-            teks_hasil = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response.text)
-            
+    file_id = uploaded_file.file_id
+    
+    # Jika foto ini belum pernah di-scan sebelumnya (mencegah hitung ganda)
+    if file_id not in st.session_state.processed_files:
+        with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
+            try:
+                image = Image.open(uploaded_file)
+                prompt = """
+                Kamu adalah asisten diet wanita gen z yang ramah, manis, dan suportif bernama Kalorya.
+                Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi nutrisinya.
+                
+                SANGAT PENTING: Untuk nilai angka, kamu WAJIB menjawab dengan satu ANGKA BULAT saja. Dilarang keras menggunakan rentang (seperti 10-20), dilarang menggunakan kurang dari/lebih dari, dilarang koma/desimal. Jika ragu, tebak satu angka pasti!
+                
+                Format balasan harus persis seperti ini (hanya isi kurung siku dengan ANGKA BULAT):
+                **Nama Makanan:** [Tebakanmu]
+                **Estimasi Kalori:** [Angka] kcal
+                **Karbohidrat:** [Angka] g
+                **Protein:** [Angka] g
+                **Lemak:** [Angka] g
+                
+                Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
+                """
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content([prompt, image])
+                teks_hasil = response.text
+                
+                # Ekstraksi angka menggunakan Regex
+                kalori_match = re.search(r'\*\*Estimasi Kalori:\*\*\s*(\d+)', teks_hasil)
+                karbo_match = re.search(r'\*\*Karbohidrat:\*\*\s*(\d+)', teks_hasil)
+                protein_match = re.search(r'\*\*Protein:\*\*\s*(\d+)', teks_hasil)
+                lemak_match = re.search(r'\*\*Lemak:\*\*\s*(\d+)', teks_hasil)
+                
+                # Simpan ke memori (State)
+                if kalori_match: st.session_state.consumed_calories += int(kalori_match.group(1))
+                if karbo_match: st.session_state.consumed_carbs += int(karbo_match.group(1))
+                if protein_match: st.session_state.consumed_protein += int(protein_match.group(1))
+                if lemak_match: st.session_state.consumed_fat += int(lemak_match.group(1))
+                
+                # Tandai foto ini sudah diproses
+                st.session_state.processed_files.add(file_id)
+                
+                # Format tebal (bold) untuk ditampilkan dan simpan riwayatnya
+                teks_hasil_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
+                st.session_state.last_response = teks_hasil_html
+                
+                # Refresh halaman secara otomatis untuk mengupdate ring kalori di atas
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
+    else:
+        # Menampilkan teks respons AI yang sudah tersimpan tanpa menghitung ulang kalori
+        if st.session_state.last_response:
             st.markdown(f"""
             <div class="cute-card" style="background-color: #FFF0F5; border: 2px solid #FFB7B2;">
                 <h4 style="color: #FFB7B2; margin-top:0;">✨ Hasil Scan Kalorya:</h4>
                 <div style="color: #5D4037; font-size: 1.05rem; line-height: 1.6;">
-                    {teks_hasil.replace(chr(10), '<br>')}
+                    {st.session_state.last_response.replace(chr(10), '<br>')}
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
-            try:
-                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                st.info(f"Info Diagnostik - Model yang didukung oleh API Key Anda: {available_models}")
-            except Exception as ex:
-                pass
 
 st.markdown("<br><br>", unsafe_allow_html=True)
+
+# --- TOMBOL RESTART ---
+if st.button("Restart Hitungan Hari Ini 🔄", use_container_width=True):
+    # Reset semua indikator kalori
+    st.session_state.consumed_calories = 0
+    st.session_state.consumed_carbs = 0
+    st.session_state.consumed_protein = 0
+    st.session_state.consumed_fat = 0
+    # Reset memori gambar dan respons AI
+    st.session_state.processed_files = set()
+    st.session_state.last_response = ""
+    # Reset kotak upload gambar
+    st.session_state.uploader_key = str(uuid.uuid4())
+    # Segarkan halaman
+    st.rerun()
