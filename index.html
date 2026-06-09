@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kalorya</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Phosphor Icons for cute minimal icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-text">
+                <div class="logo-container">
+                    <img src="kalorya_logo.png.jpeg" alt="Icon" class="app-icon">
+                    <span class="app-brand-name">Kalorya</span>
+                </div>
+                <h1>Hai cantik! 🌸</h1>
+                <p class="subtitle">Tetep konsisten, ya!</p>
+            </div>
+            <div class="profile-pic">
+                <img src="https://api.dicebear.com/7.x/notionists/svg?seed=KaloryaGirl&backgroundColor=ffd5dc" alt="Profile">
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Calorie Ring Widget -->
+            <section class="calorie-widget glass-card">
+                <div class="ring-container">
+                    <svg class="progress-ring" width="160" height="160">
+                        <circle class="ring-bg" stroke-width="12" fill="transparent" r="70" cx="80" cy="80"/>
+                        <circle class="ring-progress" stroke-width="12" fill="transparent" r="70" cx="80" cy="80"/>
+                    </svg>
+                    <div class="ring-text">
+                        <span class="consumed">1.250</span>
+                        <span class="target">/ 1.800 kcal</span>
+                    </div>
+                </div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="label">Karbo</span>
+                        <div class="mini-bar bg-blue"><div class="fill" style="width: 70%"></div></div>
+                        <span class="value">120g</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Protein</span>
+                        <div class="mini-bar bg-pink"><div class="fill" style="width: 45%"></div></div>
+                        <span class="value">45g</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="label">Lemak</span>
+                        <div class="mini-bar bg-sage"><div class="fill" style="width: 60%"></div></div>
+                        <span class="value">40g</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Weight Progress Widget -->
+            <section class="weight-widget glass-card">
+                <div class="weight-header">
+                    <h3>Target Berat Badan</h3>
+                    <button class="update-weight-btn"><i class="ph-bold ph-plus"></i> Update</button>
+                </div>
+                <div class="weight-track">
+                    <div class="weight-points">
+                        <span class="current">Awal: 65 kg</span>
+                        <span class="target">Target: 55 kg</span>
+                    </div>
+                    <div class="weight-bar-bg">
+                        <div class="weight-bar-fill" style="width: 30%">
+                            <div class="current-indicator">62 kg</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Feedback Card -->
+            <section class="feedback-card">
+                <i class="ph-fill ph-sparkle text-pink"></i>
+                <div class="feedback-text">
+                    <p>Wah, makan siangmu terlihat enak! Masih ada ruang <strong>550 kalori</strong> untuk cemilan manis sore ini 🍰</p>
+                </div>
+            </section>
+
+            <!-- Recent Snaps -->
+            <section class="recent-snaps">
+                <h3>Makan Hari Ini</h3>
+                <div class="snap-list">
+                    <div class="snap-item glass-card">
+                        <div class="snap-icon bg-pink-light">
+                            <i class="ph ph-coffee"></i>
+                        </div>
+                        <div class="snap-info">
+                            <h4>Sarapan (Matcha Latte)</h4>
+                            <p>08:00 AM</p>
+                        </div>
+                        <div class="snap-cal">
+                            <span>250 kcal</span>
+                        </div>
+                    </div>
+                    <div class="snap-item glass-card">
+                        <div class="snap-icon bg-sage-light">
+                            <i class="ph ph-bowl-food"></i>
+                        </div>
+                        <div class="snap-info">
+                            <h4>Makan Siang (Salad Ayam)</h4>
+                            <p>12:30 PM</p>
+                        </div>
+                        <div class="snap-cal">
+                            <span>600 kcal</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Riwayat Kalori -->
+            <section class="history-section">
+                <h3>Riwayat Dietmu</h3>
+                <div class="history-list">
+                    <div class="history-item glass-card success">
+                        <div class="date-info">
+                            <span class="day">Rabu</span>
+                            <span class="date">8 Jun</span>
+                        </div>
+                        <div class="status-info">
+                            <h4>Sempurna! 🎯</h4>
+                            <p>Defisit tercapai (1.500 kcal)</p>
+                        </div>
+                    </div>
+                    <div class="history-item glass-card warning">
+                        <div class="date-info">
+                            <span class="day">Selasa</span>
+                            <span class="date">7 Jun</span>
+                        </div>
+                        <div class="status-info">
+                            <h4>Agak Berlebihan 🍰</h4>
+                            <p>Lebih 200 kalori dari target</p>
+                        </div>
+                    </div>
+                    <div class="history-item glass-card success">
+                        <div class="date-info">
+                            <span class="day">Senin</span>
+                            <span class="date">6 Jun</span>
+                        </div>
+                        <div class="status-info">
+                            <h4>Bagus Banget! ✨</h4>
+                            <p>Tepat di angka 1.750 kcal</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Floating Camera Button -->
+        <div class="fab-container">
+            <button class="snap-btn" id="snapBtn">
+                <i class="ph-bold ph-camera"></i>
+            </button>
+        </div>
+        
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item active"><i class="ph-fill ph-house"></i></a>
+            <a href="#" class="nav-item"><i class="ph ph-chart-pie-slice"></i></a>
+            <a href="#" class="nav-item"><i class="ph ph-user"></i></a>
+        </nav>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
