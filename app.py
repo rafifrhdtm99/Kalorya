@@ -3,9 +3,69 @@ import google.generativeai as genai
 from PIL import Image
 import re
 import uuid
+import json
 from datetime import datetime
 
+# Impor Firebase
+import firebase_admin
+from firebase_admin import credentials, firestore
+
 st.set_page_config(page_title="Kalorya", page_icon="🌸", layout="centered")
+
+# --- KONFIGURASI FIREBASE ---
+db = None
+firebase_configured = False
+if not firebase_admin._apps:
+    try:
+        if "FIREBASE_KEY" in st.secrets:
+            key_dict = json.loads(st.secrets["FIREBASE_KEY"])
+            cred = credentials.Certificate(key_dict)
+            firebase_admin.initialize_app(cred)
+            db = firestore.client()
+            firebase_configured = True
+    except Exception as e:
+        st.error(f"⚠️ Menunggu Perbaikan Kunci Firebase Anda...")
+else:
+    try:
+        db = firestore.client()
+        firebase_configured = True
+    except Exception:
+        pass
+
+# --- FUNGSI DATABASE ---
+def load_data_from_db():
+    if not firebase_configured or db is None:
+        return
+    try:
+        doc_ref = db.collection('kalorya').document('user_data')
+        doc = doc_ref.get()
+        if doc.exists:
+            data = doc.to_dict()
+            st.session_state.consumed_calories = data.get('consumed_calories', 0)
+            st.session_state.consumed_carbs = data.get('consumed_carbs', 0)
+            st.session_state.consumed_protein = data.get('consumed_protein', 0)
+            st.session_state.consumed_fat = data.get('consumed_fat', 0)
+            st.session_state.meal_history = data.get('meal_history', [])
+            st.session_state.target_calories = data.get('target_calories', 1800)
+    except Exception as e:
+        print(f"Error loading from db: {e}")
+
+def save_data_to_db():
+    if not firebase_configured or db is None:
+        return
+    try:
+        doc_ref = db.collection('kalorya').document('user_data')
+        doc_ref.set({
+            'consumed_calories': st.session_state.consumed_calories,
+            'consumed_carbs': st.session_state.consumed_carbs,
+            'consumed_protein': st.session_state.consumed_protein,
+            'consumed_fat': st.session_state.consumed_fat,
+            'meal_history': st.session_state.meal_history,
+            'target_calories': st.session_state.target_calories,
+            'last_updated': firestore.SERVER_TIMESTAMP
+        })
+    except Exception as e:
+        print(f"Error saving to db: {e}")
 
 # --- INISIALISASI STATE (MEMORI APLIKASI) ---
 if 'consumed_calories' not in st.session_state:
@@ -23,9 +83,14 @@ if 'last_response' not in st.session_state:
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = str(uuid.uuid4())
 if 'meal_history' not in st.session_state:
-    st.session_state.meal_history = [] # Daftar riwayat makanan
+    st.session_state.meal_history = [] 
 if 'target_calories' not in st.session_state:
     st.session_state.target_calories = 1800
+
+# Muat data dari Firebase SAAT PERTAMA KALI dibuka (Autoload)
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = True
+    load_data_from_db()
 
 # --- KONFIGURASI GEMINI AI ---
 api_key_configured = False
@@ -86,7 +151,6 @@ st.markdown("""
         transform: scale(1.02);
     }
     
-    /* CSS List Jurnal Makanan */
     .meal-item {
         background-color: #FFF0F5;
         border-left: 4px solid #FFB7B2;
@@ -126,7 +190,8 @@ with st.expander("⚙️ Atur Target Kalori Harian"):
         "Berapa batas kalori kamu hari ini?", 
         min_value=500, max_value=5000, 
         value=st.session_state.target_calories, 
-        step=50
+        step=50,
+        on_change=save_data_to_db
     ))
 
 # --- WIDGET LINGKARAN KALORI ---
@@ -192,6 +257,9 @@ st.markdown("<p style='text-align:center; color:#8D6E63; margin-top:-10px; margi
 
 if not api_key_configured:
     st.error("⚠️ Menunggu Kunci Rahasia... Minta panduan dari developer untuk memasukkan API Key di Streamlit Secrets.")
+
+if not firebase_configured:
+    st.warning("🗄️ Database belum terhubung dengan sempurna. Data Anda hari ini mungkin belum tersimpan permanen.")
 
 uploaded_file = st.file_uploader("Scan Kalori!", type=["jpg", "png", "jpeg", "webp"], label_visibility="collapsed", key=st.session_state.uploader_key)
 
@@ -266,6 +334,9 @@ if uploaded_file is not None and api_key_configured:
                     teks_hasil_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
                     st.session_state.last_response = teks_hasil_html
                     
+                    # Lakukan AUTOSAVE ke Firebase sebelum layar direfresh!
+                    save_data_to_db()
+                    
                     st.rerun()
                     
                 except Exception as e:
@@ -293,4 +364,8 @@ if st.button("Restart Hitungan Hari Ini 🔄", use_container_width=True):
     st.session_state.last_response = ""
     st.session_state.meal_history = []
     st.session_state.uploader_key = str(uuid.uuid4())
+    
+    # Kosongkan juga isi database di Firebase
+    save_data_to_db()
+    
     st.rerun()
