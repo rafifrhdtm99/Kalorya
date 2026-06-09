@@ -6,6 +6,7 @@ import uuid
 import json
 from datetime import datetime
 import pandas as pd
+import base64
 
 # Impor Firebase
 import firebase_admin
@@ -156,42 +157,58 @@ try:
 except Exception:
     pass
 
+# --- FUNGSI BANTUAN UI ---
+def get_base64_of_bin_file(bin_file):
+    try:
+        with open(bin_file, 'rb') as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except Exception:
+        return ""
+
+bg_base64 = get_base64_of_bin_file("doodle_bg.png")
+
 # --- INJEKSI CSS ---
-st.markdown("""
+st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
-    html, body, [class*="css"] {
+    html, body, [class*="css"] {{
         font-family: 'Quicksand', sans-serif !important;
-        background-color: #FEF9F8 !important;
         color: #5D4037 !important;
-    }
+    }}
     /* Memperlebar tampilan dan memperbesar font di komputer */
-    @media (min-width: 768px) {
-        .block-container {
+    @media (min-width: 768px) {{
+        .block-container {{
             max-width: 900px !important;
-        }
-        html {
+        }}
+        html {{
             font-size: 18px !important;
-        }
-    }
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .stApp {background-color: #FEF9F8;}
-    .cute-card {
-        background: rgba(255, 255, 255, 0.9);
+        }}
+    }}
+    header {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+    .stApp {{
+        background-color: #FEF9F8 !important;
+        background-image: url("data:image/png;base64,{bg_base64}");
+        background-size: 350px;
+        background-repeat: repeat;
+        background-blend-mode: overlay;
+    }}
+    .cute-card {{
+        background: rgba(255, 255, 255, 0.95);
         border-radius: 24px;
         padding: 24px;
         box-shadow: 0 8px 32px rgba(255, 183, 178, 0.2);
         border: 1px solid rgba(255, 255, 255, 0.8);
         margin-bottom: 24px;
-    }
-    [data-testid="stFileUploadDropzone"] {
+    }}
+    [data-testid="stFileUploadDropzone"] {{
         background-color: #FFB7B2 !important;
         border: 2px dashed #FFF !important;
         border-radius: 24px !important;
         padding: 20px !important;
-    }
-    .meal-item {
+    }}
+    .meal-item {{
         background-color: #FFF0F5;
         border-left: 4px solid #FFB7B2;
         padding: 12px 16px;
@@ -200,22 +217,31 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         align-items: center;
-    }
-    .meal-name {font-weight: 700; color: #5D4037;}
-    .meal-cal {font-weight: 700; color: #FFB7B2;}
+    }}
+    .meal-name {{font-weight: 700; color: #5D4037;}}
+    .meal-cal {{font-weight: 700; color: #FFB7B2;}}
 </style>
 """, unsafe_allow_html=True)
 
 # --- HEADER APP ---
-col1, col2 = st.columns([1, 4])
-with col1:
-    st.image("kalorya_logo.png.jpeg", width=65)
-with col2:
-    if st.session_state.gender == 'Laki-laki':
-        st.markdown(f"<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem; color:#5D4037;'>Halo, Bro {st.session_state.logged_in_user.title()}! 💪</h1>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem; color:#5D4037;'>Hai cantik, {st.session_state.logged_in_user.title()}! 🌸</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='color:#8D6E63; font-weight:600; margin-top:0;'>Kalorya - Tetep konsisten, ya!</p>", unsafe_allow_html=True)
+
+logo_base64 = get_base64_of_bin_file("kalorya_logo.png.jpeg")
+
+if st.session_state.gender == 'Laki-laki':
+    sapaan_teks = f"Halo, Bro {st.session_state.logged_in_user.title()}! 💪"
+else:
+    sapaan_teks = f"Hai cantik, {st.session_state.logged_in_user.title()}! 🌸"
+
+header_html = f"""
+<div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+    <img src="data:image/jpeg;base64,{logo_base64}" width="65" style="border-radius: 12px; box-shadow: 0 4px 10px rgba(255,183,178,0.3);">
+    <div>
+        <h1 style="margin: 0; padding: 0; font-size: 2.2rem; color: #5D4037; line-height: 1.2;">{sapaan_teks}</h1>
+        <p style="margin: 0; padding: 0; color: #8D6E63; font-weight: 600; font-size: 1rem;">Kalorya - Tetep konsisten, ya!</p>
+    </div>
+</div>
+"""
+st.markdown(header_html, unsafe_allow_html=True)
 
 st.write("") 
 
