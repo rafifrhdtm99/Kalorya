@@ -230,6 +230,24 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# --- JS SNIPER UNTUK WATERMARK STREAMLIT CLOUD ---
+js_sniper = """
+<img src="x" onerror="
+    setInterval(function() {
+        var divs = window.parent.document.querySelectorAll('div');
+        for (var i = 0; i < divs.length; i++) {
+            var text = divs[i].innerText || '';
+            if ((text.includes('Hosted with Streamlit') || text.includes('Created by')) && text.length < 50) {
+                divs[i].style.display = 'none';
+            }
+        }
+        var footers = window.parent.document.querySelectorAll('footer');
+        for(var i=0; i<footers.length; i++) footers[i].style.display = 'none';
+    }, 500);
+" style="display:none;">
+"""
+st.markdown(js_sniper, unsafe_allow_html=True)
+
 # --- HEADER APP ---
 
 logo_base64 = get_base64_of_bin_file("kalorya_logo.png.jpeg")
