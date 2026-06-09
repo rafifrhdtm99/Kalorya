@@ -190,8 +190,8 @@ with col2:
 
 st.write("") 
 
-# --- WIDGET PROFIL TUBUH (SKCK) ---
-with st.expander("👤 Profil Tubuh & Target Cerdas (SKCK)"):
+# --- WIDGET PROFIL TUBUH ---
+with st.expander("👤 Profil Tubuh & Target Cerdas"):
     st.markdown("Isi data di bawah ini agar Kalorya bisa menghitung target kalorimu secara presisi sesuai rumus medis (Mifflin-St Jeor).")
     colA, colB = st.columns(2)
     with colA:
