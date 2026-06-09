@@ -165,6 +165,15 @@ st.markdown("""
         background-color: #FEF9F8 !important;
         color: #5D4037 !important;
     }
+    /* Memperlebar tampilan dan memperbesar font di komputer */
+    @media (min-width: 768px) {
+        .block-container {
+            max-width: 900px !important;
+        }
+        html {
+            font-size: 18px !important;
+        }
+    }
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stApp {background-color: #FEF9F8;}
@@ -202,7 +211,10 @@ col1, col2 = st.columns([1, 4])
 with col1:
     st.image("kalorya_logo.png.jpeg", width=65)
 with col2:
-    st.markdown(f"<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem; color:#5D4037;'>Hai cantik, {st.session_state.logged_in_user.title()}! 🌸</h1>", unsafe_allow_html=True)
+    if st.session_state.gender == 'Laki-laki':
+        st.markdown(f"<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem; color:#5D4037;'>Halo, Bro {st.session_state.logged_in_user.title()}! 💪</h1>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem; color:#5D4037;'>Hai cantik, {st.session_state.logged_in_user.title()}! 🌸</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#8D6E63; font-weight:600; margin-top:0;'>Kalorya - Tetep konsisten, ya!</p>", unsafe_allow_html=True)
 
 st.write("") 
@@ -330,8 +342,11 @@ if uploaded_file is not None and api_key_configured:
             with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
                 try:
                     image = Image.open(uploaded_file)
-                    prompt = """
-                    Kamu adalah asisten diet wanita gen z yang ramah, manis, dan suportif bernama Kalorya.
+                    
+                    sapaan_ai = "teman bro nge-gym yang asik dan suportif" if st.session_state.gender == "Laki-laki" else "wanita gen z yang ramah, manis, dan suportif"
+                    
+                    prompt = f"""
+                    Kamu adalah asisten diet {sapaan_ai} bernama Kalorya.
                     Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi nutrisinya.
                     SANGAT PENTING: Untuk nilai angka, kamu WAJIB menjawab dengan satu ANGKA BULAT saja. Dilarang keras menggunakan rentang (seperti 10-20), dilarang menggunakan kurang dari/lebih dari, dilarang koma/desimal. Jika ragu, tebak satu angka pasti!
                     Format balasan harus persis seperti ini (hanya isi kurung siku dengan format yang diminta):
@@ -340,7 +355,7 @@ if uploaded_file is not None and api_key_configured:
                     **Karbohidrat:** [Angka Bulat] g
                     **Protein:** [Angka Bulat] g
                     **Lemak:** [Angka Bulat] g
-                    Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
+                    Berikan 1 atau 2 kalimat suportif khas gen z di bagian paling bawah untuk menyemangati dia!
                     """
                     model = genai.GenerativeModel('gemini-2.5-flash')
                     response = model.generate_content([prompt, image], generation_config={"temperature": 0.0})
