@@ -36,6 +36,8 @@ else:
 # --- STATE LOGIN (MULTI-USER) ---
 if 'logged_in_user' not in st.session_state:
     st.session_state.logged_in_user = None
+if 'user_pin' not in st.session_state:
+    st.session_state.user_pin = ""
 
 # --- FUNGSI DATABASE ---
 def load_data_from_db():
@@ -81,6 +83,7 @@ def save_data_to_db():
             'umur': st.session_state.get('umur', 20),
             'gender': st.session_state.get('gender', 'Perempuan'),
             'weight_history': st.session_state.get('weight_history', {}),
+            'pin': st.session_state.get('user_pin', ''),
             'last_updated': firestore.SERVER_TIMESTAMP
         })
     except Exception as e:
@@ -89,14 +92,28 @@ def save_data_to_db():
 # --- HALAMAN LOGIN ---
 if st.session_state.logged_in_user is None:
     st.markdown("<h1 style='text-align:center; color:#FFB7B2; font-family:Quicksand;'>Selamat Datang di Kalorya! 🌸</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align:center; color:#8D6E63;'>Langkah pertamamu menuju <i>body goals</i> dimulai di sini! Tulis nama panggilanmu biar Kalorya bisa menyimpan jurnal makanan dan grafik berat badanmu secara eksklusif. ✨</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; color:#8D6E63;'>Langkah pertamamu menuju <i>body goals</i> dimulai di sini! Tulis nama panggilanmu dan buat sebuah PIN rahasia biar ruanganmu tidak bisa diintip orang lain. ✨</p>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         username_input = st.text_input("Siapa namamu?", placeholder="Misal: Sarah")
-        submit = st.form_submit_button("Masuk 🚀", use_container_width=True)
+        pin_input = st.text_input("Buat / Masukkan PIN Rahasia (Bebas Angka/Huruf)", type="password", placeholder="••••")
+        submit = st.form_submit_button("Masuk / Buka Ruangan 🚀", use_container_width=True)
         
-        if submit and username_input:
+        if submit and username_input and pin_input:
+            if firebase_configured and db is not None:
+                username_clean = username_input.lower().strip()
+                doc_ref = db.collection('kalorya_users').document(username_clean)
+                doc = doc_ref.get()
+                
+                if doc.exists:
+                    data = doc.to_dict()
+                    saved_pin = data.get('pin', '')
+                    if saved_pin != "" and saved_pin != pin_input:
+                        st.error("Oops! PIN yang kamu masukkan salah. Coba lagi ya! ❌")
+                        st.stop()
+            
             st.session_state.logged_in_user = username_input
+            st.session_state.user_pin = pin_input
             # Reset state default
             st.session_state.consumed_calories = 0
             st.session_state.consumed_carbs = 0
