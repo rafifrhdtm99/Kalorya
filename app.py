@@ -293,8 +293,12 @@ if uploaded_file is not None and api_key_configured:
                     
                     Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
                     """
+                    # Mengatur temperature ke 0 agar tebakan AI selalu konsisten
                     model = genai.GenerativeModel('gemini-2.5-flash')
-                    response = model.generate_content([prompt, image])
+                    response = model.generate_content(
+                        [prompt, image],
+                        generation_config={"temperature": 0.0}
+                    )
                     teks_hasil = response.text
                     
                     # Ekstraksi angka & teks menggunakan Regex
