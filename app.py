@@ -21,6 +21,8 @@ if 'last_response' not in st.session_state:
     st.session_state.last_response = ""
 if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = str(uuid.uuid4())
+if 'meal_history' not in st.session_state:
+    st.session_state.meal_history = [] # Daftar riwayat makanan
 
 # --- KONFIGURASI GEMINI AI ---
 api_key_configured = False
@@ -42,12 +44,10 @@ st.markdown("""
         color: #5D4037 !important;
     }
     
-    /* Menyembunyikan elemen bawaan Streamlit agar bersih */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .stApp {background-color: #FEF9F8;}
     
-    /* Desain Kartu Kaca (Glass Card) */
     .cute-card {
         background: rgba(255, 255, 255, 0.9);
         border-radius: 24px;
@@ -57,7 +57,6 @@ st.markdown("""
         margin-bottom: 24px;
     }
     
-    /* Mempercantik tombol upload Streamlit menjadi mirip tombol kamera */
     [data-testid="stFileUploadDropzone"] {
         background-color: #FFB7B2 !important;
         border: 2px dashed #FFF !important;
@@ -75,7 +74,6 @@ st.markdown("""
         height: 40px;
     }
     
-    /* Tombol Restart */
     .stButton>button {
         background-color: #FFF0F5 !important;
         color: #FFB7B2 !important;
@@ -89,6 +87,28 @@ st.markdown("""
         color: white !important;
         transform: scale(1.02);
     }
+    
+    /* CSS List Jurnal Makanan */
+    .meal-item {
+        background-color: #FFF0F5;
+        border-left: 4px solid #FFB7B2;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .meal-name {
+        font-weight: 700;
+        color: #5D4037;
+        font-size: 1rem;
+    }
+    .meal-cal {
+        font-weight: 700;
+        color: #FFB7B2;
+        font-size: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -100,9 +120,9 @@ with col2:
     st.markdown("<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem; color:#5D4037;'>Hai cantik! 🌸</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#8D6E63; font-weight:600; margin-top:0;'>Kalorya - Tetep konsisten, ya!</p>", unsafe_allow_html=True)
 
-st.write("") # Spasi
+st.write("") 
 
-# --- WIDGET LINGKARAN KALORI (HTML CUSTOM) ---
+# --- WIDGET LINGKARAN KALORI ---
 consumed = st.session_state.consumed_calories
 karbo = st.session_state.consumed_carbs
 protein = st.session_state.consumed_protein
@@ -141,16 +161,27 @@ ring_html = f"""<div class="cute-card">
 </div>"""
 st.markdown(ring_html, unsafe_allow_html=True)
 
+# --- JURNAL MAKANAN HARI INI ---
+st.markdown("<h3 style='color:#5D4037; font-weight:700; margin-top:20px; margin-bottom:15px;'>Jurnal Makananmu 📖</h3>", unsafe_allow_html=True)
+if len(st.session_state.meal_history) == 0:
+    st.markdown("<p style='color:#8D6E63; font-style:italic;'>Belum ada makanan yang dicatat hari ini. Yuk scan makan siangmu!</p>", unsafe_allow_html=True)
+else:
+    for index, meal in enumerate(st.session_state.meal_history):
+        st.markdown(f"""
+        <div class="meal-item">
+            <div class="meal-name">🍽️ {meal['name']}</div>
+            <div class="meal-cal">+{meal['calories']} kcal</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # --- FITUR UTAMA: SCAN KAMERA & AI ---
-st.write("")
+st.markdown("<hr style='border-top: 2px dashed #FFE2E2; margin: 30px 0;'>", unsafe_allow_html=True)
 st.markdown("<h3 style='color:#5D4037; text-align:center; font-weight:700;'>Scan Makananmu Di Sini! 📸</h3>", unsafe_allow_html=True)
 st.markdown("<p style='text-align:center; color:#8D6E63; margin-top:-10px; margin-bottom:20px;'>Klik tombol pink di bawah untuk memfoto atau upload gambar makananmu.</p>", unsafe_allow_html=True)
 
 if not api_key_configured:
     st.error("⚠️ Menunggu Kunci Rahasia... Minta panduan dari developer untuk memasukkan API Key di Streamlit Secrets.")
 
-# Tombol Upload menggunakan key dinamis agar bisa di-reset
 uploaded_file = st.file_uploader("Scan Kalori!", type=["jpg", "png", "jpeg", "webp"], label_visibility="collapsed", key=st.session_state.uploader_key)
 
 if uploaded_file is not None and api_key_configured:
@@ -158,7 +189,6 @@ if uploaded_file is not None and api_key_configured:
     
     file_id = uploaded_file.file_id
     
-    # Jika foto ini belum pernah di-scan sebelumnya (mencegah hitung ganda)
     if file_id not in st.session_state.processed_files:
         with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
             try:
@@ -169,12 +199,12 @@ if uploaded_file is not None and api_key_configured:
                 
                 SANGAT PENTING: Untuk nilai angka, kamu WAJIB menjawab dengan satu ANGKA BULAT saja. Dilarang keras menggunakan rentang (seperti 10-20), dilarang menggunakan kurang dari/lebih dari, dilarang koma/desimal. Jika ragu, tebak satu angka pasti!
                 
-                Format balasan harus persis seperti ini (hanya isi kurung siku dengan ANGKA BULAT):
-                **Nama Makanan:** [Tebakanmu]
-                **Estimasi Kalori:** [Angka] kcal
-                **Karbohidrat:** [Angka] g
-                **Protein:** [Angka] g
-                **Lemak:** [Angka] g
+                Format balasan harus persis seperti ini (hanya isi kurung siku dengan format yang diminta):
+                **Nama Makanan:** [Tebakan Nama Makanan Singkat]
+                **Estimasi Kalori:** [Angka Bulat] kcal
+                **Karbohidrat:** [Angka Bulat] g
+                **Protein:** [Angka Bulat] g
+                **Lemak:** [Angka Bulat] g
                 
                 Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
                 """
@@ -182,17 +212,32 @@ if uploaded_file is not None and api_key_configured:
                 response = model.generate_content([prompt, image])
                 teks_hasil = response.text
                 
-                # Ekstraksi angka menggunakan Regex
+                # Ekstraksi angka & teks menggunakan Regex
+                nama_match = re.search(r'\*\*Nama Makanan:\*\*\s*(.+)', teks_hasil)
                 kalori_match = re.search(r'\*\*Estimasi Kalori:\*\*\s*(\d+)', teks_hasil)
                 karbo_match = re.search(r'\*\*Karbohidrat:\*\*\s*(\d+)', teks_hasil)
                 protein_match = re.search(r'\*\*Protein:\*\*\s*(\d+)', teks_hasil)
                 lemak_match = re.search(r'\*\*Lemak:\*\*\s*(\d+)', teks_hasil)
                 
-                # Simpan ke memori (State)
-                if kalori_match: st.session_state.consumed_calories += int(kalori_match.group(1))
+                # Update Angka Kalori dkk
+                kalori_baru = 0
+                if kalori_match: 
+                    kalori_baru = int(kalori_match.group(1))
+                    st.session_state.consumed_calories += kalori_baru
                 if karbo_match: st.session_state.consumed_carbs += int(karbo_match.group(1))
                 if protein_match: st.session_state.consumed_protein += int(protein_match.group(1))
                 if lemak_match: st.session_state.consumed_fat += int(lemak_match.group(1))
+                
+                # Tambahkan ke Jurnal Riwayat Makanan
+                nama_makanan_baru = "Makanan Lezat"
+                if nama_match:
+                    # Ambil nama makanan tanpa tanda titik/koma berlebih di akhir jika ada
+                    nama_makanan_baru = nama_match.group(1).strip()
+                
+                st.session_state.meal_history.append({
+                    "name": nama_makanan_baru,
+                    "calories": kalori_baru
+                })
                 
                 # Tandai foto ini sudah diproses
                 st.session_state.processed_files.add(file_id)
@@ -201,13 +246,11 @@ if uploaded_file is not None and api_key_configured:
                 teks_hasil_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
                 st.session_state.last_response = teks_hasil_html
                 
-                # Refresh halaman secara otomatis untuk mengupdate ring kalori di atas
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
     else:
-        # Menampilkan teks respons AI yang sudah tersimpan tanpa menghitung ulang kalori
         if st.session_state.last_response:
             st.markdown(f"""
             <div class="cute-card" style="background-color: #FFF0F5; border: 2px solid #FFB7B2;">
@@ -222,15 +265,12 @@ st.markdown("<br><br>", unsafe_allow_html=True)
 
 # --- TOMBOL RESTART ---
 if st.button("Restart Hitungan Hari Ini 🔄", use_container_width=True):
-    # Reset semua indikator kalori
     st.session_state.consumed_calories = 0
     st.session_state.consumed_carbs = 0
     st.session_state.consumed_protein = 0
     st.session_state.consumed_fat = 0
-    # Reset memori gambar dan respons AI
     st.session_state.processed_files = set()
     st.session_state.last_response = ""
-    # Reset kotak upload gambar
+    st.session_state.meal_history = []
     st.session_state.uploader_key = str(uuid.uuid4())
-    # Segarkan halaman
     st.rerun()
