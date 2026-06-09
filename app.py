@@ -187,12 +187,14 @@ st.markdown(f"""
     }}
     header {{visibility: hidden;}}
     footer {{visibility: hidden;}}
+    .viewerBadge_container__1QSob {{display: none !important;}}
+    .stDeployButton {{display: none !important;}}
+    [data-testid="stToolbar"] {{display: none !important;}}
     .stApp {{
         background-color: #FEF9F8 !important;
-        background-image: url("data:image/png;base64,{bg_base64}");
-        background-size: 350px;
+        background-image: linear-gradient(rgba(254, 249, 248, 0.9), rgba(254, 249, 248, 0.9)), url("data:image/png;base64,{bg_base64}");
+        background-size: auto, 350px;
         background-repeat: repeat;
-        background-blend-mode: overlay;
     }}
     .cute-card {{
         background: rgba(255, 255, 255, 0.95);
@@ -233,11 +235,11 @@ else:
     sapaan_teks = f"Hai cantik, {st.session_state.logged_in_user.title()}! 🌸"
 
 header_html = f"""
-<div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-    <img src="data:image/jpeg;base64,{logo_base64}" width="65" style="border-radius: 12px; box-shadow: 0 4px 10px rgba(255,183,178,0.3);">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: nowrap;">
+    <img src="data:image/jpeg;base64,{logo_base64}" style="width: clamp(45px, 15vw, 65px); height: auto; border-radius: 12px; box-shadow: 0 4px 10px rgba(255,183,178,0.3); flex-shrink: 0;">
     <div>
-        <h1 style="margin: 0; padding: 0; font-size: 2.2rem; color: #5D4037; line-height: 1.2;">{sapaan_teks}</h1>
-        <p style="margin: 0; padding: 0; color: #8D6E63; font-weight: 600; font-size: 1rem;">Kalorya - Tetep konsisten, ya!</p>
+        <h1 style="margin: 0; padding: 0; font-size: clamp(1.4rem, 6vw, 2.2rem); color: #5D4037; line-height: 1.2;">{sapaan_teks}</h1>
+        <p style="margin: 0; padding: 0; color: #8D6E63; font-weight: 600; font-size: clamp(0.85rem, 3.5vw, 1rem);">Kalorya - Tetep konsisten, ya!</p>
     </div>
 </div>
 """
