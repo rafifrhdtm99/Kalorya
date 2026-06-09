@@ -75,46 +75,41 @@ target = 1800
 progress = min((consumed / target) * 100, 100)
 dash_offset = 439.8 - (439.8 * progress / 100)
 
-ring_html = f"""
-<div class="cute-card">
-    <div style="position: relative; width: 180px; height: 180px; margin: 0 auto 20px;">
-        <svg width="180" height="180" viewBox="0 0 160 160" style="transform: rotate(-90deg);">
-            <circle cx="80" cy="80" r="70" fill="none" stroke="#FFE2E2" stroke-width="14" />
-            <circle cx="80" cy="80" r="70" fill="none" stroke="#FFB7B2" stroke-width="14" 
-                    stroke-dasharray="439.8" stroke-dashoffset="{dash_offset}" 
-                    stroke-linecap="round" />
-        </svg>
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-            <div style="font-size: 2.2rem; font-weight: 700; color: #5D4037;">{consumed}</div>
-            <div style="font-size: 1rem; color: #8D6E63; font-weight: 500;">/ {target} kcal</div>
-        </div>
-    </div>
-    
-    <div style="display: flex; justify-content: space-around; margin-top: 10px;">
-        <div style="text-align: center;">
-            <div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Karbo</div>
-            <div style="width: 55px; height: 6px; background: #E0F2F1; border-radius: 3px; margin: 0 auto 8px;">
-                <div style="width: 80%; height: 100%; background: #4DD0E1; border-radius: 3px;"></div>
-            </div>
-            <div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">120g</div>
-        </div>
-        <div style="text-align: center;">
-            <div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Protein</div>
-            <div style="width: 55px; height: 6px; background: #FFE2E2; border-radius: 3px; margin: 0 auto 8px;">
-                <div style="width: 75%; height: 100%; background: #FFB7B2; border-radius: 3px;"></div>
-            </div>
-            <div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">45g</div>
-        </div>
-        <div style="text-align: center;">
-            <div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Lemak</div>
-            <div style="width: 55px; height: 6px; background: #E8F5E9; border-radius: 3px; margin: 0 auto 8px;">
-                <div style="width: 80%; height: 100%; background: #81C784; border-radius: 3px;"></div>
-            </div>
-            <div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">40g</div>
-        </div>
-    </div>
+ring_html = f"""<div class="cute-card">
+<div style="position: relative; width: 180px; height: 180px; margin: 0 auto 20px;">
+<svg width="180" height="180" viewBox="0 0 160 160" style="transform: rotate(-90deg);">
+<circle cx="80" cy="80" r="70" fill="none" stroke="#FFE2E2" stroke-width="14" />
+<circle cx="80" cy="80" r="70" fill="none" stroke="#FFB7B2" stroke-width="14" stroke-dasharray="439.8" stroke-dashoffset="{dash_offset}" stroke-linecap="round" />
+</svg>
+<div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+<div style="font-size: 2.2rem; font-weight: 700; color: #5D4037;">{consumed}</div>
+<div style="font-size: 1rem; color: #8D6E63; font-weight: 500;">/ {target} kcal</div>
 </div>
-"""
+</div>
+<div style="display: flex; justify-content: space-around; margin-top: 10px;">
+<div style="text-align: center;">
+<div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Karbo</div>
+<div style="width: 55px; height: 6px; background: #E0F2F1; border-radius: 3px; margin: 0 auto 8px;">
+<div style="width: 80%; height: 100%; background: #4DD0E1; border-radius: 3px;"></div>
+</div>
+<div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">120g</div>
+</div>
+<div style="text-align: center;">
+<div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Protein</div>
+<div style="width: 55px; height: 6px; background: #FFE2E2; border-radius: 3px; margin: 0 auto 8px;">
+<div style="width: 75%; height: 100%; background: #FFB7B2; border-radius: 3px;"></div>
+</div>
+<div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">45g</div>
+</div>
+<div style="text-align: center;">
+<div style="font-size: 0.85rem; color: #8D6E63; font-weight: 600; margin-bottom: 8px;">Lemak</div>
+<div style="width: 55px; height: 6px; background: #E8F5E9; border-radius: 3px; margin: 0 auto 8px;">
+<div style="width: 80%; height: 100%; background: #81C784; border-radius: 3px;"></div>
+</div>
+<div style="font-weight: 700; color: #5D4037; font-size: 1.1rem;">40g</div>
+</div>
+</div>
+</div>"""
 st.markdown(ring_html, unsafe_allow_html=True)
 
 
