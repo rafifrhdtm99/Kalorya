@@ -41,7 +41,7 @@ st.markdown("""
 # Header
 col1, col2 = st.columns([1, 4])
 with col1:
-    st.image("kalorya_logo.png", width=60)
+    st.image("kalorya_logo.png.jpeg", width=60)
 with col2:
     st.markdown("<h1 style='margin-bottom:0; padding-bottom:0; font-size:2.2rem;'>Hai cantik! 🌸</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#8D6E63; font-weight:600; margin-top:0;'>Kalorya - Tetep konsisten, ya!</p>", unsafe_allow_html=True)
