@@ -144,6 +144,7 @@ if uploaded_file is not None and api_key_configured:
             Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
             """
             model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content([prompt, image])
             import re
             teks_hasil = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', response.text)
             
