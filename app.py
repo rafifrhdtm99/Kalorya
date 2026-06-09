@@ -143,7 +143,7 @@ if uploaded_file is not None and api_key_configured:
             
             Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
             """
-            model = genai.GenerativeModel('gemini-3.1-pro-preview')
+            model = genai.GenerativeModel('gemini-pro-latest')
             response = model.generate_content([prompt, image])
             teks_hasil = response.text
             
