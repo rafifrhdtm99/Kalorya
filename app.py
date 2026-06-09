@@ -3,6 +3,7 @@ import google.generativeai as genai
 from PIL import Image
 import re
 import uuid
+from datetime import datetime
 
 st.set_page_config(page_title="Kalorya", page_icon="🌸", layout="centered")
 
@@ -67,11 +68,6 @@ st.markdown("""
         color: white !important;
         font-weight: 700 !important;
         font-size: 1.1rem !important;
-    }
-    [data-testid="stFileUploadDropzone"] svg {
-        fill: white !important;
-        width: 40px;
-        height: 40px;
     }
     
     .stButton>button {
@@ -167,9 +163,13 @@ if len(st.session_state.meal_history) == 0:
     st.markdown("<p style='color:#8D6E63; font-style:italic;'>Belum ada makanan yang dicatat hari ini. Yuk scan makan siangmu!</p>", unsafe_allow_html=True)
 else:
     for index, meal in enumerate(st.session_state.meal_history):
+        jam_teks = meal.get('time', 'Waktu tak dicatat')
         st.markdown(f"""
         <div class="meal-item">
-            <div class="meal-name">🍽️ {meal['name']}</div>
+            <div>
+                <div style="font-size: 0.8rem; color: #8D6E63; margin-bottom: 4px;">🕰️ {jam_teks}</div>
+                <div class="meal-name">🍽️ {meal['name']}</div>
+            </div>
             <div class="meal-cal">+{meal['calories']} kcal</div>
         </div>
         """, unsafe_allow_html=True)
@@ -190,66 +190,75 @@ if uploaded_file is not None and api_key_configured:
     file_id = uploaded_file.file_id
     
     if file_id not in st.session_state.processed_files:
-        with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
-            try:
-                image = Image.open(uploaded_file)
-                prompt = """
-                Kamu adalah asisten diet wanita gen z yang ramah, manis, dan suportif bernama Kalorya.
-                Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi nutrisinya.
-                
-                SANGAT PENTING: Untuk nilai angka, kamu WAJIB menjawab dengan satu ANGKA BULAT saja. Dilarang keras menggunakan rentang (seperti 10-20), dilarang menggunakan kurang dari/lebih dari, dilarang koma/desimal. Jika ragu, tebak satu angka pasti!
-                
-                Format balasan harus persis seperti ini (hanya isi kurung siku dengan format yang diminta):
-                **Nama Makanan:** [Tebakan Nama Makanan Singkat]
-                **Estimasi Kalori:** [Angka Bulat] kcal
-                **Karbohidrat:** [Angka Bulat] g
-                **Protein:** [Angka Bulat] g
-                **Lemak:** [Angka Bulat] g
-                
-                Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
-                """
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content([prompt, image])
-                teks_hasil = response.text
-                
-                # Ekstraksi angka & teks menggunakan Regex
-                nama_match = re.search(r'\*\*Nama Makanan:\*\*\s*(.+)', teks_hasil)
-                kalori_match = re.search(r'\*\*Estimasi Kalori:\*\*\s*(\d+)', teks_hasil)
-                karbo_match = re.search(r'\*\*Karbohidrat:\*\*\s*(\d+)', teks_hasil)
-                protein_match = re.search(r'\*\*Protein:\*\*\s*(\d+)', teks_hasil)
-                lemak_match = re.search(r'\*\*Lemak:\*\*\s*(\d+)', teks_hasil)
-                
-                # Update Angka Kalori dkk
-                kalori_baru = 0
-                if kalori_match: 
-                    kalori_baru = int(kalori_match.group(1))
-                    st.session_state.consumed_calories += kalori_baru
-                if karbo_match: st.session_state.consumed_carbs += int(karbo_match.group(1))
-                if protein_match: st.session_state.consumed_protein += int(protein_match.group(1))
-                if lemak_match: st.session_state.consumed_fat += int(lemak_match.group(1))
-                
-                # Tambahkan ke Jurnal Riwayat Makanan
-                nama_makanan_baru = "Makanan Lezat"
-                if nama_match:
-                    # Ambil nama makanan tanpa tanda titik/koma berlebih di akhir jika ada
-                    nama_makanan_baru = nama_match.group(1).strip()
-                
-                st.session_state.meal_history.append({
-                    "name": nama_makanan_baru,
-                    "calories": kalori_baru
-                })
-                
-                # Tandai foto ini sudah diproses
-                st.session_state.processed_files.add(file_id)
-                
-                # Format tebal (bold) untuk ditampilkan dan simpan riwayatnya
-                teks_hasil_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
-                st.session_state.last_response = teks_hasil_html
-                
-                st.rerun()
-                
-            except Exception as e:
-                st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
+        
+        # Tambahkan Input Jam Makan
+        waktu_makan = st.time_input("Jam berapa kamu makan ini? 🕰️ (Opsional)", value=None)
+        
+        # Tambahkan tombol Hitung agar AI tidak langsung berjalan otomatis
+        if st.button("Hitung Kalorinya Sekarang! ✨", use_container_width=True):
+            with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
+                try:
+                    image = Image.open(uploaded_file)
+                    prompt = """
+                    Kamu adalah asisten diet wanita gen z yang ramah, manis, dan suportif bernama Kalorya.
+                    Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi nutrisinya.
+                    
+                    SANGAT PENTING: Untuk nilai angka, kamu WAJIB menjawab dengan satu ANGKA BULAT saja. Dilarang keras menggunakan rentang (seperti 10-20), dilarang menggunakan kurang dari/lebih dari, dilarang koma/desimal. Jika ragu, tebak satu angka pasti!
+                    
+                    Format balasan harus persis seperti ini (hanya isi kurung siku dengan format yang diminta):
+                    **Nama Makanan:** [Tebakan Nama Makanan Singkat]
+                    **Estimasi Kalori:** [Angka Bulat] kcal
+                    **Karbohidrat:** [Angka Bulat] g
+                    **Protein:** [Angka Bulat] g
+                    **Lemak:** [Angka Bulat] g
+                    
+                    Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
+                    """
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    response = model.generate_content([prompt, image])
+                    teks_hasil = response.text
+                    
+                    # Ekstraksi angka & teks menggunakan Regex
+                    nama_match = re.search(r'\*\*Nama Makanan:\*\*\s*(.+)', teks_hasil)
+                    kalori_match = re.search(r'\*\*Estimasi Kalori:\*\*\s*(\d+)', teks_hasil)
+                    karbo_match = re.search(r'\*\*Karbohidrat:\*\*\s*(\d+)', teks_hasil)
+                    protein_match = re.search(r'\*\*Protein:\*\*\s*(\d+)', teks_hasil)
+                    lemak_match = re.search(r'\*\*Lemak:\*\*\s*(\d+)', teks_hasil)
+                    
+                    # Update Angka Kalori dkk
+                    kalori_baru = 0
+                    if kalori_match: 
+                        kalori_baru = int(kalori_match.group(1))
+                        st.session_state.consumed_calories += kalori_baru
+                    if karbo_match: st.session_state.consumed_carbs += int(karbo_match.group(1))
+                    if protein_match: st.session_state.consumed_protein += int(protein_match.group(1))
+                    if lemak_match: st.session_state.consumed_fat += int(lemak_match.group(1))
+                    
+                    # Format Waktu
+                    jam_str = waktu_makan.strftime('%H:%M') if waktu_makan else "Waktu tak dicatat"
+                    
+                    # Tambahkan ke Jurnal Riwayat Makanan
+                    nama_makanan_baru = "Makanan Lezat"
+                    if nama_match:
+                        nama_makanan_baru = nama_match.group(1).strip()
+                    
+                    st.session_state.meal_history.append({
+                        "name": nama_makanan_baru,
+                        "calories": kalori_baru,
+                        "time": jam_str
+                    })
+                    
+                    # Tandai foto ini sudah diproses
+                    st.session_state.processed_files.add(file_id)
+                    
+                    # Format tebal (bold) untuk ditampilkan dan simpan riwayatnya
+                    teks_hasil_html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
+                    st.session_state.last_response = teks_hasil_html
+                    
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
     else:
         if st.session_state.last_response:
             st.markdown(f"""
