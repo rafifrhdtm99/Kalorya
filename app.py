@@ -24,6 +24,8 @@ if 'uploader_key' not in st.session_state:
     st.session_state.uploader_key = str(uuid.uuid4())
 if 'meal_history' not in st.session_state:
     st.session_state.meal_history = [] # Daftar riwayat makanan
+if 'target_calories' not in st.session_state:
+    st.session_state.target_calories = 1800
 
 # --- KONFIGURASI GEMINI AI ---
 api_key_configured = False
@@ -118,14 +120,23 @@ with col2:
 
 st.write("") 
 
+# --- PENGATURAN TARGET KALORI ---
+with st.expander("⚙️ Atur Target Kalori Harian"):
+    st.session_state.target_calories = int(st.number_input(
+        "Berapa batas kalori kamu hari ini?", 
+        min_value=500, max_value=5000, 
+        value=st.session_state.target_calories, 
+        step=50
+    ))
+
 # --- WIDGET LINGKARAN KALORI ---
 consumed = st.session_state.consumed_calories
 karbo = st.session_state.consumed_carbs
 protein = st.session_state.consumed_protein
 lemak = st.session_state.consumed_fat
 
-target = 1800
-progress = min((consumed / target) * 100, 100)
+target = st.session_state.target_calories
+progress = min((consumed / target) * 100, 100) if target > 0 else 100
 dash_offset = 439.8 - (439.8 * progress / 100)
 
 ring_html = f"""<div class="cute-card">
