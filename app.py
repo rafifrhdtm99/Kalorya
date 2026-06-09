@@ -470,9 +470,27 @@ with tab1:
                         **Lemak:** [Angka Bulat] g
                         Berikan 1 or 2 kalimat suportif khas gen z di bagian paling bawah untuk menyemangati dia!
                         """
-                        model = genai.GenerativeModel('gemini-flash-latest')
-                        response = model.generate_content([prompt, image], generation_config={"temperature": 0.0})
-                        teks_hasil = response.text
+                        # Coba beberapa model secara bergantian jika ada yang terkena limit kuota 429
+                        models_to_try = ['gemini-flash-latest', 'gemini-flash-lite-latest']
+                        teks_hasil = None
+                        last_error = None
+                        
+                        for model_name in models_to_try:
+                            try:
+                                model = genai.GenerativeModel(model_name)
+                                response = model.generate_content([prompt, image], generation_config={"temperature": 0.0})
+                                teks_hasil = response.text
+                                break
+                            except Exception as ex:
+                                last_error = ex
+                                error_msg = str(ex)
+                                if "429" in error_msg or "quota" in error_msg.lower():
+                                    continue
+                                else:
+                                    raise ex
+                                    
+                        if teks_hasil is None:
+                            raise last_error
                     
                         nama_match = re.search(r'\*\*Nama Makanan:\*\*\s*(.+)', teks_hasil)
                         kalori_match = re.search(r'\*\*Estimasi Kalori:\*\*\s*(\d+)', teks_hasil)
@@ -498,7 +516,13 @@ with tab1:
                         save_data_to_db()
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Duh, mataku (AI) agak blur. Detail error: {e}")
+                        error_msg = str(e)
+                        if "429" in error_msg or "quota" in error_msg.lower():
+                            st.error("⏳ Oops! Semua model AI pendukung sedang terkena batas kuota gratis harian (limit 20 request/hari per model). Silakan tunggu beberapa saat atau coba besok ya cantik! 🌸")
+                            with st.expander("Detail Teknis Error (untuk Developer)"):
+                                st.write(error_msg)
+                        else:
+                            st.error(f"Duh, mataku (AI) agak blur. Detail error: {e}")
         else:
             if st.session_state.last_response:
                 st.markdown(f"""
