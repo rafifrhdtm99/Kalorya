@@ -187,7 +187,12 @@ st.markdown(f"""
     }}
     header {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    .viewerBadge_container__1QSob {{display: none !important;}}
+    .viewerBadge_container__1QSob, 
+    div[class^="viewerBadge"], 
+    .viewerBadge_link__1S137,
+    a[href*="streamlit"] {
+        display: none !important;
+    }
     .stDeployButton {{display: none !important;}}
     [data-testid="stToolbar"] {{display: none !important;}}
     .stApp {{
