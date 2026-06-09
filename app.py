@@ -651,9 +651,47 @@ with tab2:
         tgl_str = tanggal_pilihan.strftime("%Y-%m-%d")
         if tgl_str in daily_records:
             st.success(f"Total Kalori pada {tgl_str}: **{daily_records[tgl_str]['calories']} kcal**")
-            for meal in daily_records[tgl_str]["meals"]:
+            for idx, meal in enumerate(daily_records[tgl_str]["meals"]):
                 jam_teks = meal.get("time", "Waktu tak dicatat")
-                st.markdown(f"""<div class=\"meal-item\"><div style=\"font-size: 0.8rem; color: #8D6E63; margin-bottom: 4px;\">🕰️ {jam_teks}</div><div class=\"meal-name\">🍽️ {meal['name']}</div><div class=\"meal-cal\">+{meal['calories']} kcal</div></div>""", unsafe_allow_html=True)
+                col_info, col_del = st.columns([7, 1])
+                with col_info:
+                    st.markdown(f"""
+                    <div class="meal-item" style="margin-bottom: 0;">
+                        <div>
+                            <div style="font-size: 0.8rem; color: #8D6E63; margin-bottom: 4px;">🕰️ {jam_teks}</div>
+                            <div class="meal-name">🍽️ {meal['name']}</div>
+                        </div>
+                        <div class="meal-cal">+{meal['calories']} kcal</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col_del:
+                    st.write("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                    if st.button("❌", key=f"del_past_meal_{idx}_{tgl_str}", help=f"Hapus {meal['name']}", use_container_width=True):
+                        meal_to_delete = daily_records[tgl_str]["meals"][idx]
+                        
+                        # Kurangi total harian untuk tanggal tersebut
+                        daily_records[tgl_str]["calories"] = max(0, daily_records[tgl_str]["calories"] - meal_to_delete.get("calories", 0))
+                        daily_records[tgl_str]["carbs"] = max(0, daily_records[tgl_str].get("carbs", 0) - meal_to_delete.get("carbs", 0))
+                        daily_records[tgl_str]["protein"] = max(0, daily_records[tgl_str].get("protein", 0) - meal_to_delete.get("protein", 0))
+                        daily_records[tgl_str]["fat"] = max(0, daily_records[tgl_str].get("fat", 0) - meal_to_delete.get("fat", 0))
+                        
+                        # Hapus item dari list
+                        daily_records[tgl_str]["meals"].pop(idx)
+                        
+                        # Sinkronisasi dengan today's session state jika yang dihapus adalah makanan hari ini
+                        today_str = get_today_str()
+                        if tgl_str == today_str:
+                            st.session_state.consumed_calories = daily_records[tgl_str]["calories"]
+                            st.session_state.consumed_carbs = daily_records[tgl_str]["carbs"]
+                            st.session_state.consumed_protein = daily_records[tgl_str]["protein"]
+                            st.session_state.consumed_fat = daily_records[tgl_str]["fat"]
+                            st.session_state.meal_history = daily_records[tgl_str]["meals"]
+                            
+                        st.session_state.daily_records = daily_records
+                        save_data_to_db()
+                        st.success(f"Berhasil menghapus {meal_to_delete['name']} dari riwayat! 🗑️")
+                        st.rerun()
+                st.write("")
         else:
             st.warning("Tidak ada catatan makanan pada tanggal ini.")
 
