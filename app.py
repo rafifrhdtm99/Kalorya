@@ -143,7 +143,7 @@ if uploaded_file is not None and api_key_configured:
             
             Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
             """
-            model = genai.GenerativeModel('gemini-pro-vision')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content([prompt, image])
             teks_hasil = response.text
             
@@ -158,5 +158,10 @@ if uploaded_file is not None and api_key_configured:
             
         except Exception as e:
             st.error(f"Duh, mataku (AI) agak blur. Ada error nih: {e}")
+            try:
+                available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                st.info(f"Info Diagnostik - Model yang didukung oleh API Key Anda: {available_models}")
+            except Exception as ex:
+                pass
 
 st.markdown("<br><br>", unsafe_allow_html=True)
