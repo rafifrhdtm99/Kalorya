@@ -237,6 +237,7 @@ if st.session_state.logged_in_user is None:
             st.session_state.weight_history = {}
             st.session_state.bb_awal = 50
             st.session_state.bb_target = 50
+            st.session_state.scan_success_message = ""
             # Muat data usernya
             load_data_from_db()
             st.rerun()
@@ -261,6 +262,7 @@ if 'tb' not in st.session_state: st.session_state.tb = 160
 if 'umur' not in st.session_state: st.session_state.umur = 20
 if 'gender' not in st.session_state: st.session_state.gender = 'Perempuan'
 if 'weight_history' not in st.session_state: st.session_state.weight_history = {}
+if 'scan_success_message' not in st.session_state: st.session_state.scan_success_message = ""
 
 # --- CEK PERGANTIAN HARI (MIDNIGHT RESET) ---
 today_str = get_today_str()
@@ -508,13 +510,21 @@ with tab1:
     if not api_key_configured:
         st.error("⚠️ Menunggu Kunci Rahasia... Minta panduan dari developer.")
 
+    if st.session_state.get('scan_success_message'):
+        st.success(st.session_state.scan_success_message)
+        st.session_state.scan_success_message = ""
+
     uploaded_file = st.file_uploader("Scan Kalori!", type=["jpg", "png", "jpeg", "webp"], label_visibility="collapsed", key=st.session_state.uploader_key)
 
     if uploaded_file is not None and api_key_configured:
         st.image(uploaded_file, caption="Makanan yang sedang diproses...", use_container_width=True)
         file_id = uploaded_file.file_id
         if file_id not in st.session_state.processed_files:
-            waktu_makan = st.time_input("Jam berapa kamu makan ini? 🕰️ (Opsional)", value=None)
+            col_tgl, col_jam = st.columns(2)
+            with col_tgl:
+                tanggal_makan = st.date_input("Tanggal makan 📅", value=datetime.now(WIB).date())
+            with col_jam:
+                waktu_makan = st.time_input("Jam makan 🕰️ (Opsional)", value=None)
             if st.button("Hitung Kalorinya Sekarang! ✨", use_container_width=True):
                 with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
                     try:
@@ -569,28 +579,61 @@ with tab1:
                         
                         if kalori_match: 
                             kalori_baru = int(kalori_match.group(1))
-                            st.session_state.consumed_calories += kalori_baru
                         if karbo_match: 
                             karbo_baru = int(karbo_match.group(1))
-                            st.session_state.consumed_carbs += karbo_baru
                         if protein_match: 
                             protein_baru = int(protein_match.group(1))
-                            st.session_state.consumed_protein += protein_baru
                         if lemak_match: 
                             lemak_baru = int(lemak_match.group(1))
-                            st.session_state.consumed_fat += lemak_baru
                     
                         jam_str = waktu_makan.strftime('%H:%M') if waktu_makan else "Waktu tak dicatat"
                         nama_makanan_baru = nama_match.group(1).strip() if nama_match else "Makanan Lezat"
-                    
-                        st.session_state.meal_history.append({
+                        
+                        # Tentukan tanggal tujuan log
+                        tgl_str = tanggal_makan.strftime("%Y-%m-%d")
+                        today_str = get_today_str()
+                        
+                        new_meal = {
                             "name": nama_makanan_baru, 
                             "calories": kalori_baru, 
                             "carbs": karbo_baru,
                             "protein": protein_baru,
                             "fat": lemak_baru,
                             "time": jam_str
-                        })
+                        }
+                        
+                        if tgl_str == today_str:
+                            st.session_state.consumed_calories += kalori_baru
+                            st.session_state.consumed_carbs += karbo_baru
+                            st.session_state.consumed_protein += protein_baru
+                            st.session_state.consumed_fat += lemak_baru
+                            st.session_state.meal_history.append(new_meal)
+                            st.session_state.scan_success_message = f"Berhasil mencatat {nama_makanan_baru} (+{kalori_baru} kcal) ke Jurnal hari ini! 🍽️"
+                        else:
+                            if 'daily_records' not in st.session_state:
+                                st.session_state.daily_records = {}
+                            if tgl_str not in st.session_state.daily_records:
+                                st.session_state.daily_records[tgl_str] = {
+                                    'calories': 0,
+                                    'carbs': 0,
+                                    'protein': 0,
+                                    'fat': 0,
+                                    'meals': []
+                                }
+                            
+                            st.session_state.daily_records[tgl_str]['calories'] += kalori_baru
+                            st.session_state.daily_records[tgl_str]['carbs'] = st.session_state.daily_records[tgl_str].get('carbs', 0) + karbo_baru
+                            st.session_state.daily_records[tgl_str]['protein'] = st.session_state.daily_records[tgl_str].get('protein', 0) + protein_baru
+                            st.session_state.daily_records[tgl_str]['fat'] = st.session_state.daily_records[tgl_str].get('fat', 0) + lemak_baru
+                            st.session_state.daily_records[tgl_str]['meals'].append(new_meal)
+                            
+                            try:
+                                tgl_dt = datetime.strptime(tgl_str, "%Y-%m-%d")
+                                tgl_cantik = tgl_dt.strftime("%d %b %Y")
+                            except Exception:
+                                tgl_cantik = tgl_str
+                            st.session_state.scan_success_message = f"Berhasil mencatat {nama_makanan_baru} (+{kalori_baru} kcal) ke riwayat tanggal {tgl_cantik}! 📅"
+                    
                         st.session_state.processed_files.add(file_id)
                         st.session_state.last_response = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', teks_hasil)
                     
@@ -623,6 +666,7 @@ with tab1:
         st.session_state.last_response = ""
         st.session_state.meal_history = []
         st.session_state.uploader_key = str(uuid.uuid4())
+        st.session_state.scan_success_message = ""
         save_data_to_db()
         st.rerun()
 
