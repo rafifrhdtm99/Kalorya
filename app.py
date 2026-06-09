@@ -130,7 +130,6 @@ if uploaded_file is not None and api_key_configured:
     with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
         try:
             image = Image.open(uploaded_file)
-            model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = """
             Kamu adalah asisten diet wanita gen z yang ramah, manis, dan suportif bernama Kalorya.
             Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi kasar nutrisinya.
@@ -144,7 +143,7 @@ if uploaded_file is not None and api_key_configured:
             
             Berikan 1 atau 2 kalimat suportif dan lucu khas gen z di bagian paling bawah untuk menyemangati dia!
             """
-            
+            model = genai.GenerativeModel('gemini-1.5-pro-latest')
             response = model.generate_content([prompt, image])
             teks_hasil = response.text
             
