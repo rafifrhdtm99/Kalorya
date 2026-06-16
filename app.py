@@ -525,6 +525,12 @@ with tab1:
                 tanggal_makan = st.date_input("Tanggal makan 📅", value=datetime.now(WIB).date())
             with col_jam:
                 waktu_makan = st.time_input("Jam makan 🕰️ (Opsional)", value=None)
+            
+            detail_makanan = st.text_input(
+                "Detail makanan / petunjuk untuk AI 📝 (Opsional):", 
+                placeholder="Misal: Udang tepung (bukan ayam goreng), nasi sop bakso"
+            )
+            
             if st.button("Hitung Kalorinya Sekarang! ✨", use_container_width=True):
                 with st.spinner("✨ AI Kalorya sedang menebak kalori makananmu..."):
                     try:
@@ -532,9 +538,13 @@ with tab1:
                     
                         sapaan_ai = "teman bro nge-gym yang asik dan suportif" if st.session_state.gender == "Laki-laki" else "wanita gen z yang ramah, manis, dan suportif"
                     
+                        petunjuk_tambahan = ""
+                        if detail_makanan.strip():
+                            petunjuk_tambahan = f"\nPengguna memberikan petunjuk tambahan tentang makanan ini: '{detail_makanan.strip()}'. Gunakan petunjuk ini untuk membantu mengidentifikasi makanan dengan tepat."
+
                         prompt = f"""
                         Kamu adalah asisten diet {sapaan_ai} bernama Kalorya.
-                        Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi nutrisinya.
+                        Tolong tebak makanan apa yang ada di gambar ini dan berikan estimasi nutrisinya.{petunjuk_tambahan}
                         SANGAT PENTING: Untuk nilai angka, kamu WAJIB menjawab dengan satu ANGKA BULAT saja. Dilarang keras menggunakan rentang (seperti 10-20), dilarang menggunakan kurang dari/lebih dari, dilarang koma/desimal. Jika ragu, tebak satu angka pasti!
                         Format balasan harus persis seperti ini (hanya isi kurung siku dengan format yang diminta):
                         **Nama Makanan:** [Tebakan Nama Makanan Singkat]
